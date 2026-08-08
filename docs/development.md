@@ -24,7 +24,7 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | in progress |
 | DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | pending |
 | DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | pending |
-| DS-004 | Merchant service: `Merchant` aggregate, FinLedger account provisioning on activation, Ops BFF approve/reject | `ds-004/merchant-service` | pending |
+| DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject | `ds-004/merchant-service` | pending |
 | DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | pending |
 | DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | pending |
 | DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects | `ds-007/processing-guarantees` | pending |

@@ -9,7 +9,8 @@ Adapters in → Application (ports/use cases) → Domain (framework-free)
                       ↑
               Infrastructure implements ports
               · Orchestrator FinLedgerClient (LedgerPort): rails/settle/splits/refunds
-              · Merchant FinLedger client (AccountProvisioningPort): accounts only
+              · Merchant FinLedger client (AccountProvisioningPort):
+                SUB_MERCHANT tenant + wallets on activation
               · Rail Adapter: PSP only — NO FinLedger client
 ```
 
@@ -21,8 +22,8 @@ Gateway → Merchant BFF | Payment Orchestrator | Ops BFF
          +---------------+---------------+
          |               |               |
    Merchant Service  Risk Service   Rail Adapter
-   (account provis.                 (PSP MmSandbox
-    → FinLedger)                     ONLY — no FinLedger)
+   (SUB_MERCHANT                    (PSP MmSandbox
+    tenant+wallets)                  ONLY — no FinLedger)
                          |
          Orchestrator LedgerPort → FinLedger
            (rails / settle / splits / refunds)
@@ -37,8 +38,8 @@ Notification consumes payment.lifecycle.v1 only (never FinLedger outbox directly
 
 **Ownership (non-negotiable):** Rail Adapter never calls FinLedger. Orchestrator alone
 drives payment/refund ledger calls, and only **after** the PSP has accepted processing
-(plan §4.1). Merchant keeps a separate FinLedger ACL for account provisioning — a second
-ACL, not a contradiction.
+(plan §4.1). Merchant keeps a separate FinLedger ACL that provisions a `SUB_MERCHANT`
+tenant + wallets on activation — a second ACL, not a contradiction (plan §9.3, Q14).
 
 ## Repo layout
 
@@ -91,7 +92,7 @@ payhub-platform/
 | Topic | Document |
 |-------|----------|
 | Full product plan | [PLAN_PAYHUB.md](PLAN_PAYHUB.md) |
-| Structural decisions | [PLAN_PAYHUB.md §19](PLAN_PAYHUB.md) and [adr/](adr/) |
+| Structural decisions | [PLAN_PAYHUB.md §19](PLAN_PAYHUB.md) and [adr/](adr/) (DS-ADR-001 Accepted) |
 | Payment + refund state machines | Plan §1.4, §4.1, §4.3 |
 | Ports per service | Plan §2.2 |
 | Roadmap / bootstrap | [development.md](development.md) |

@@ -20,8 +20,10 @@
 
 # Runtime
 *.log
-graphify-out/.graphify_*
-graphify-out/.needs_update
+# graphify knowledge graph (local)
+graphify-out/
 
 # OS
 Thumbs.db
+
+.DS_Store
