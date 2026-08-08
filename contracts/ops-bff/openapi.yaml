@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: ops-bff
+  version: 0.0.1
+  description: Stub contract for DS-002 scaffold — expand in later tickets.
+paths:
+  /actuator/health:
+    get:
+      summary: Health probe
+      operationId: health
+      responses:
+        '200':
+          description: OK

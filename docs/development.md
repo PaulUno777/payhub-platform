@@ -21,8 +21,8 @@ PRs are human-owned (agents do not open them unless asked).
 
 | Ticket | Phase | Branch slug | Status |
 |--------|-------|-------------|--------|
-| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | in progress |
-| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | pending |
+| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | done |
+| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | in progress |
 | DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | pending |
 | DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject | `ds-004/merchant-service` | pending |
 | DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | pending |
@@ -76,8 +76,8 @@ this guide and it contradicts the project's own progressive-complexity principle
 - `packageName`: `com.payhub.<service>`
 - `javaVersion`: `21`
 - `packaging`: `jar`
-- `bootVersion`: leave unspecified so Initializr picks current stable Spring Boot 3.x, then
-  pin it explicitly in every generated `pom.xml` so all services stay in lockstep
+- `bootVersion`: **`4.1.0`** (pass `-d bootVersion=4.1.0.RELEASE` to Initializr; reactor
+  parent pins `spring-boot-starter-parent` **4.1.0** so all services stay in lockstep)
 
 ### 1. Generate each service via the Initializr HTTP API — DS-002 minimal starters only
 
