@@ -10,7 +10,7 @@ sans mettre à jour ce fichier.
   PENDING créé par `POST .../rails/payments` **après acceptation PSP** représente
   "en attente de règlement" (voir `PLAN_PAYHUB.md` §1.4, §4.1, §9.1, §19).
 - ~~Q2 — Ownership FinLedger rails/*~~ → **Résolu : Orchestrator only.** Rail Adapter =
-  PSP uniquement. Merchant garde une ACL séparée pour le provisioning de compte.
+  PSP uniquement. Merchant garde une ACL séparée pour provisioning tenant+wallets (Q14).
 - ~~Q2b — Trou PENDING si initiate-avant-PSP~~ → **Résolu par réordonnancement.** PSP
   d'abord ; `initiate` seulement après acceptation traitement ; rejet net = zéro
   compensation ledger ; PENDING orphelin nettoyé via Break `request reversal`.
@@ -20,10 +20,12 @@ sans mettre à jour ce fichier.
 - ~~Q4 — Merchant onboarding hors scope~~ → **Inversé.** `merchant-service` est désormais
   un bounded context à part entière dès DS-004 (portail admin Angular prévu — hors roadmap
   DS-0xx v1, voir Q12).
-- ~~Q5 — `tenant.events.v1` utile via Q4~~ → **Toujours retiré du catalogue v1.** La
-  création de tenant reste `platform:admin` côté FinLedger ; `merchant-service` gère le
-  cycle de vie du *sous-marchand* PayHub, pas du tenant FinLedger — ce sont deux choses
-  différentes. Pas de topic nécessaire pour l'instant.
+- ~~Q5 — `tenant.events.v1` utile via Q4~~ → **Toujours retiré du catalogue v1.** Pas de
+  topic control-plane. La création du tenant FinLedger `SUB_MERCHANT` est un effet de
+  l'activation marchand (Q14), pas un événement Kafka PayHub.
+- ~~Q14 — Merchant = tenant FinLedger `SUB_MERCHANT` ou compte seul~~ → **Résolu (DS-001).**
+  `Merchant` actif → tenant FinLedger `SUB_MERCHANT` + wallets via
+  `AccountProvisioningPort` (voir `PLAN_PAYHUB.md` §9.3, §19, `context-map.md`).
 
 ## Toujours ouvertes
 
@@ -78,11 +80,8 @@ en migration/schéma.
 
 ### Q12 — Portail admin Angular : ticket dédié ou hors roadmap DS-0xx ?
 
-§19 motive `merchant-service` par un portail Angular futur, mais aucun DS-0xx ne le
-construit. Ops BFF REST suffit pour DS-004/009/010.
-
-**À lever :** explicitement "hors v1 / post-capstone", ou ajouter un ticket UI plus tard.
-Ne pas laisser l'Angular devenir du scope creep silencieux pendant DS-004.
+**Décision v1 :** hors roadmap DS-0xx / post-capstone. Ops BFF REST suffit pour
+DS-004/009/010. Ne pas démarrer d'UI Angular pendant les tickets plateforme.
 
 ### Q13 — `initiate` échoue après acceptation PSP → retry forever ?
 
@@ -94,16 +93,6 @@ l'argent PSP.
 
 **À lever :** seulement si DS-003 révèle un code d'erreur FinLedger qui impose un autre
 chemin.
-
-### Q14 — Merchant PayHub = tenant FinLedger `SUB_MERCHANT` ou seulement un compte ?
-
-Le sandbox FinLedger `aggregator` crée un **tenant** sous-marchand (`Send Tunnel`,
-`…000a2`) avec wallets, pas seulement un compte sous le tenant EcoPay. Le plan PayHub
-parle aujourd'hui d'`AccountProvisioningPort` (compte).
-
-**À lever :** DS-001 / DS-004 — décision recommandée : aligner sur FinLedger
-(`Merchant` actif → tenant `SUB_MERCHANT` + comptes), faute de quoi le modèle sandbox et
-les JWT `tenant_id` divergeront.
 
 ### Q15 — Nommage : « Send Tunnel »
 

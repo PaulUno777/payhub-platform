@@ -57,7 +57,7 @@ Un sous-marchand d'EcoPay (onboardé et actif) crée un paiement de 100 USD (dev
 
 | Bounded context | Agrégat principal | Responsabilité | Données détenues |
 | --- | --- | --- | --- |
-| Merchant | `Merchant` | onboarding, statut, tier, règle de split assignée | statut, tier, `assignedRuleSetKey`, référence compte FinLedger |
+| Merchant | `Merchant` | onboarding, statut, tier, règle de split assignée ; provisioning FinLedger `SUB_MERCHANT` | statut, tier, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets |
 | Payment Orchestrator | `Payment` | intention, état, saga paiement + saga refund, commandes métier | paiement, refund, idempotence, outbox |
 | Risk | `RiskAssessment` | règles, limites, review manuelle | décision, raisons, versions de règles |
 | Rail Adapter | `RailOperation` | conversation PSP réelle uniquement — jamais d'appel FinLedger | opération fournisseur, attempts, raw payload chiffré |
@@ -152,14 +152,14 @@ Les transitions sont validées par l'agrégat `Payment`. Les événements extern
                  │                                                                             │
         ┌────────▼────────┐     REST (Orchestrator LedgerPort ONLY)                  ┌──────────┴──────────┐
         │   FinLedger      │◀── rails/payments, /settle, /splits, /refunds ──────────│  (pas Notification)  │
-        │  (core, jamais    │     Merchant Service : AccountProvisioningPort (compte) │                      │
-        │  forké) — outbox  │──CDC──▶ ledger.journal-entry.v1 (Reporting, Reconcile) │  Notification        │
-        │  → Debezium       │                                                          │  ← payment.lifecycle │
+        │  (core, jamais    │     Merchant : AccountProvisioningPort                  │                      │
+        │  forké) — outbox  │     (SUB_MERCHANT tenant + wallets)                    │  Notification        │
+        │  → Debezium       │──CDC──▶ ledger.journal-entry.v1 (Reporting, Reconcile) │  ← payment.lifecycle │
         └──────────────────┘                                                          │    .v1 (Orchestrator)│
                                                                                         │  livre via RabbitMQ  │
                                                                                         └────────────────────────┘
 
-  Ownership FinLedger : Orchestrator = rails/settle/splits/refunds ; Merchant = provisioning compte ;
+  Ownership FinLedger : Orchestrator = rails/settle/splits/refunds ; Merchant = SUB_MERCHANT tenant + wallets ;
   Rail Adapter = PSP uniquement (zéro appel FinLedger). Notification ne lit jamais l'outbox FinLedger.
 
   Cross-cutting : Service discovery (Compose DNS → K8s CoreDNS) · Distributed lock (Postgres advisory / K8s Lease)
@@ -210,7 +210,7 @@ payhub-platform/
 | Orchestrator | `WorkflowPort` | Temporal (`PaymentCaptureWorkflow`, `RefundWorkflow`) |
 | Orchestrator | `RiskPort` | REST interne / adapter in-memory pour tests |
 | Orchestrator | `MerchantPort` | REST interne vers `merchant-service` (`merchantId → assignedRuleSetKey`) |
-| Merchant Service | `AccountProvisioningPort` | client REST FinLedger **séparé** — création compte sous-marchand à l'activation (2ᵉ ACL, autre responsabilité) |
+| Merchant Service | `AccountProvisioningPort` | client REST FinLedger **séparé** — à l'activation : créer tenant `SUB_MERCHANT` + wallets (2ᵉ ACL ; aligné sandbox aggregator) |
 | Rail Adapter | `RailProviderPort` | PSP sandbox MmSandbox uniquement — **zéro** dépendance FinLedger |
 | Reconciliation | `StatementSourcePort` | fichiers CSV sandbox, ensuite SFTP/API |
 | Notification | `WebhookTransportPort` | HTTP signé HMAC |
@@ -218,7 +218,7 @@ payhub-platform/
 
 ### 2.3 Pourquoi pas un « shared domain »
 
-Seuls les contrats techniques étroits (trace context, event envelope, test fixtures) peuvent être partagés. Chaque service qui parle à FinLedger a **sa propre** anti-corruption layer (`FinLedgerClient` de l'Orchestrator via `LedgerPort` ; client provisioning du Merchant via `AccountProvisioningPort`). Pas de module « shared ledger SDK » métier partagé entre services.
+Seuls les contrats techniques étroits (trace context, event envelope, test fixtures) peuvent être partagés. Chaque service qui parle à FinLedger a **sa propre** anti-corruption layer (`FinLedgerClient` de l'Orchestrator via `LedgerPort` ; client Merchant via `AccountProvisioningPort` pour tenant+wallets). Pas de module « shared ledger SDK » métier partagé entre services.
 
 ---
 
@@ -370,14 +370,16 @@ Séquence Orchestrator (ordre verrouillé — voir §4.1) :
 
 ### 9.3 Merchant — nouveau bounded context
 
-- Agrégat `Merchant` : `id`, `status` (`PENDING_REVIEW` / `ACTIVE` / `SUSPENDED`), `tier`, `assignedRuleSetKey`, `finLedgerAccountId`.
-- À l'activation (`ACTIVE`), `AccountProvisioningPort` crée le compte sous-marchand côté FinLedger (ACL FinLedger **distincte** de celle de l'Orchestrator).
+- Agrégat `Merchant` : `id`, `status` (`PENDING_REVIEW` / `ACTIVE` / `SUSPENDED`), `tier`, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets FinLedger.
+- À l'activation (`ACTIVE`), `AccountProvisioningPort` crée un tenant FinLedger **`SUB_MERCHANT`** (enfant de l'agrégateur EcoPay) **et** ses wallets — ACL FinLedger **distincte** de celle de l'Orchestrator (décision DS-001 / Q14 ; alignée sandbox `aggregator` / `…a2`).
 - Approbation/rejet exposés côté Ops BFF (`POST /ops/merchants/{id}/approve|reject`).
-- Consommé par le Payment Orchestrator (`MerchantPort`) pour résoudre `merchantId → assignedRuleSetKey` avant `SelectSplitRuleKey`.
+- Consommé par le Payment Orchestrator (`MerchantPort`) pour résoudre `merchantId → assignedRuleSetKey` (et `finLedgerTenantId` pour les appels ledger) avant `SelectSplitRuleKey`.
 
 ### 9.4 Reconciliation
 
-Un run importe un statement rail idempotent, corrèle références, produit un `Break`. Actions opérateur auditables : `confirm`, `retry query`, `request reversal` (nettoie un PENDING orphelin après `RECONCILIATION_REQUIRED` → `FAILED_FINAL`), jamais de SQL direct sur FinLedger. Un seul run actif par tenant/rail (advisory lock / Lease).
+PayHub Reconciliation importe un statement rail idempotent, corrèle références, produit un `Break`. Actions opérateur auditables : `confirm`, `retry query`, `request reversal` (nettoie un PENDING orphelin après `RECONCILIATION_REQUIRED` → `FAILED_FINAL`), jamais de SQL direct sur FinLedger. Un seul run actif par tenant/rail (advisory lock / Lease).
+
+**Distinct** de la reconciliation in-box FinLedger (ADR-009 : `rail_instruction` vs settlement report) — voir `docs/context-map.md`.
 
 ---
 
@@ -404,7 +406,7 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 1. **DS-001 — Cadrage DDD :** event storming, context map (incl. Merchant), langage ubiquitaire, ownership, ADR CAP/PACELC. *Exit : context map + ADR relus et approuvés, aucun BC sans propriétaire.*
 2. **DS-002 — Fondation dépôt :** skeleton hexagonal des 10 services, ArchUnit, Compose, CI, conventions contrats. *Exit : `./mvnw test` vert sur les 10 modules, ArchUnit actif, Compose démarre.*
 3. **DS-003 — Intégration FinLedger :** image versionnée, `LedgerPort`/`FinLedgerClient` Orchestrator (smoke `rails/payments` sandbox ou endpoint de connectivité documenté — pas un contournement métier via `journal-entries`), propagation tenant/trace/idempotence. *Exit : un appel `LedgerPort` rejoué avec la même `Idempotency-Key` ne crée aucun second effet.*
-4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning compte FinLedger à l'activation, endpoints Ops BFF approve/reject. *Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un compte FinLedger référencé.*
+4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning tenant FinLedger `SUB_MERCHANT` + wallets à l'activation, endpoints Ops BFF approve/reject. *Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un `finLedgerTenantId` `SUB_MERCHANT` et des wallets référencés.*
 5. **DS-005 — Backbone events :** outbox FinLedger → Debezium → Kafka, Schema Registry, AsyncAPI, premier consumer inbox. *Exit : replay Kafka/CDC ne double aucun effet fonctionnel.*
 6. **DS-006 — Paiement happy path (sans rail réel) :** `Payment` aggregate, idempotence API, Temporal, réponse sync = `RISK_APPROVED` ; RailPort stub/in-memory. *Exit : `CREATED` → `RISK_APPROVED` + workflow démarré ; pas d'exigence `SETTLED` (c'est DS-008).*
 7. **DS-007 — Garanties de traitement :** inbox/outbox standardisées, retries, side effects idempotents. *Exit : rejouer un message dupliqué ne produit aucun second effet.*
@@ -439,7 +441,8 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 | Décision | Alternative écartée | Raison |
 | --- | --- | --- |
 | PayHub démarre en 10 microservices, pas en monolithe modulaire | Monolithe d'abord, extraction par preuve | Objectif d'apprentissage prioritaire : les frontières inter-services sont le sujet du projet, pas un risque à différer |
-| Merchant est un bounded context dédié (`merchant-service`) | Données seedées statiques, pas de service | Un portail admin Angular est prévu ; l'onboarding/approbation marchand est une action d'opérateur réelle, pas un détail de configuration |
+| Merchant est un bounded context dédié (`merchant-service`) | Données seedées statiques, pas de service | Onboarding/approbation marchand est une action d'opérateur réelle (Ops BFF) ; Angular hors v1 (Q12) |
+| Merchant actif → tenant FinLedger `SUB_MERCHANT` + wallets | Compte seul sous le tenant EcoPay | Aligné sandbox FinLedger `aggregator` ; JWT `tenant_id` / isolation cohérents (Q14) |
 | Conversation PSP = Rail Adapter only ; appels FinLedger rails/settle/splits/refunds = Orchestrator `LedgerPort` only | Rail Adapter appelle aussi FinLedger ; ou webhook PSP → HMAC FinLedger | Sépare anti-corruption PSP vs ledger ; HMAC FinLedger ≠ contrat mobile money ; `ManualRailAdapter` ne parle à aucun PSP |
 | Ordre paiement : PSP d'abord, puis `initiate` (PENDING), puis `settle` | `initiate` avant le PSP (PENDING orphelin si rejet net) | Un rejet immédiat n'a rien à compenser ; pas besoin d'inventer un `cancel` FinLedger (Q9) ; PENDING seulement après acceptation traitement |
 | Pas de hold séparé (`SUSPENSE_HOLD`) pour le paiement entrant v1 | Hold explicite en plus du PENDING rail | Le PENDING post-acceptation PSP suffit ; `SUSPENSE_HOLD` réservé à d'autres besoins (Q7) |
