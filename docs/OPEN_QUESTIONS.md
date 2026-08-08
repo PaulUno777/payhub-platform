@@ -78,11 +78,8 @@ en migration/schéma.
 
 ### Q12 — Portail admin Angular : ticket dédié ou hors roadmap DS-0xx ?
 
-§19 motive `merchant-service` par un portail Angular futur, mais aucun DS-0xx ne le
-construit. Ops BFF REST suffit pour DS-004/009/010.
-
-**À lever :** explicitement "hors v1 / post-capstone", ou ajouter un ticket UI plus tard.
-Ne pas laisser l'Angular devenir du scope creep silencieux pendant DS-004.
+**Décision v1 :** hors roadmap DS-0xx / post-capstone. Ops BFF REST suffit pour
+DS-004/009/010. Ne pas démarrer d'UI Angular pendant les tickets plateforme.
 
 ### Q13 — `initiate` échoue après acceptation PSP → retry forever ?
 
