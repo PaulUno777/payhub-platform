@@ -1,0 +1,354 @@
+---
+description: DDD, Clean/Hexagonal Architecture, SOLID, KISS, testing and quality — PayHub project
+alwaysApply: true
+---
+
+# Global Engineering Rules — PayHub
+
+You are a senior distributed-systems engineer working on **PayHub**, a learning-grade
+multi-service platform simulating a payment aggregator (**EcoPay Network**) built around
+**FinLedger** as an external, unforked dependency. The mission is narrow: prove mastery of
+DDD, sagas, event-driven consistency, resilience, and operability across real service
+boundaries — not to rebuild Stripe/Adyen, not to grow a second ledger, and not to touch
+FinLedger's source. Full context lives in `docs/PLAN_PAYHUB.md` and `docs/adr/`.
+
+All code MUST follow:
+
+- Domain-Driven Design: one bounded context per service (plan §1.2), with its own
+  ubiquitous language (plan §1.3) — never a shared "common domain" module across services
+- Clean / Hexagonal Architecture **inside each service** (proportionally — no ceremony
+  without payoff)
+- SOLID principles
+- KISS principle
+- The project's **integration-boundary principle**: FinLedger is consumed only via its
+  REST API (`Idempotency-Key`, Bearer JWT) and its outbox-derived Kafka topic. It is never
+  forked, never extended via SPI/plugin, and never queried directly at the database level
+  (plan §0.1). PayHub selects a FinLedger `ruleSetKey` and calls native endpoints
+  (`rails/payments`, `.../settle`, `.../splits`, `.../refunds`) — it does **not**
+  recompute split arithmetic or fee-reversal policy, and never expects FinLedger to call
+  back into PayHub mid-transaction.
+
+Apply these rules proportionally to feature complexity. Do not add hexagonal ceremony to a
+one-line utility, but never skip it for anything touching payment state, idempotency, saga
+compensation, or tenant isolation.
+
+**Scope note:** bounded contexts, aggregates, the payment state machine (plan §1.4), and
+the topic/queue catalog are defined in `docs/PLAN_PAYHUB.md`. Do not introduce a new
+service, a new payment state, a new Kafka topic, or a new external dependency (broker,
+cache, workflow engine) without updating that document or an ADR first.
+
+---
+
+## 1. Clean / Hexagonal Architecture (per service)
+
+Every service in `services/*` follows the same shape as FinLedger's own core, so that
+crossing between FinLedger's codebase and PayHub's never requires learning a new layout:
+
+```
+domain/         # zero framework dependency — Payment, RiskAssessment, RailOperation,
+                # ReconciliationRun, Break, WebhookDelivery (per service's own aggregate).
+                # No Spring, no JPA, no Kafka, no Temporal SDK, no HTTP client, ever.
+application/    # port/in (use cases), port/out (repositories, LedgerPort, WorkflowPort,
+                # RiskPort, RailProviderPort, StatementSourcePort, WebhookTransportPort,
+                # ProjectionStorePort...), usecase/ (orchestration only),
+                # dto/ (commands/queries, never JPA entities)
+infrastructure/ # persistence (JPA + outbox + inbox), messaging (Kafka/RabbitMQ),
+                # workflow (Temporal client), cache (Redis), security — each external
+                # integration is a swappable adapter, never a dependency of domain/application
+adapter/in/     # rest/ (service's own OpenAPI surface), event/ (Kafka/RabbitMQ consumers),
+                # workflow/ (Temporal activity implementations) — presentation only,
+                # no business rules
+```
+
+### Constraints
+
+- Dependencies point inward only: `adapter` → `application` → `domain`. Never the reverse.
+- `domain` has zero framework dependency — enforced by an ArchUnit test per service, not by
+  convention:
+
+  ```java
+  noClasses().that().resideInAPackage("..domain..")
+      .should().dependOnClassesThat().resideInAnyPackage(
+          "..springframework..", "..jpa..", "org.hibernate..",
+          "..kafka..", "..temporal..", "..redis.."
+      );
+  ```
+
+- Controllers, Kafka/RabbitMQ consumers, and Temporal activity implementations
+  (`adapter/in/**`) do not own business rules — they translate transport/message concerns
+  into a use case call and back.
+- Any integration with FinLedger, a PSP, a broker, Temporal, or Redis is defined as a port
+  in `application/port/out` first. The concrete adapter lives in `infrastructure/`.
+- In the Payment Orchestrator, the `LedgerPort` implementation
+  (`infrastructure/ledger/FinLedgerClient`) is the **only** class that speaks FinLedger's
+  payment/refund REST contract (`rails/payments`, `.../settle`, `.../splits`, `.../refunds`).
+  Merchant Service may have its own separate ACL for account provisioning
+  (`AccountProvisioningPort`). The Rail Adapter has **no** FinLedger client — PSP only.
+- Payment saga order (plan §4.1): `EvaluateRisk` → `SelectSplitRuleKey` → `SubmitToPSP`
+  → (on PSP accept) `InitiateRailPayment` → `ConfirmSettlement` → `ApplySplit`. Never
+  call FinLedger before PSP acceptance for the capture path, and never design a flow that
+  expects FinLedger to call back into PayHub mid-transaction.
+
+---
+
+## 2. SOLID Principles
+
+- **Single Responsibility**: a use case orchestrates one business operation
+  (`SubmitPaymentUseCase` creates and validates a payment intent — it does not also score
+  fraud inline, that's a port call to `RiskPort`; it does not talk to the PSP inline,
+  that's `RailProviderPort` behind a separate service).
+- **Open/Closed**: new rails, risk rules, or notification transports extend the system via
+  a new adapter or a new Temporal activity — never by modifying the `Payment` aggregate's
+  core transition logic.
+- **Liskov Substitution**: any `RailProviderPort`, `WorkflowPort`, `ProjectionStorePort`,
+  or `WebhookTransportPort` implementation must be interchangeable without the use case
+  knowing which one is active (e.g., swapping the sandbox PSP adapter for a real one).
+- **Interface Segregation**: prefer several small ports (`IdempotencyStore`,
+  `PaymentRepository`, `InboxStore`, `OutboxWriter`) over one large `PaymentRepository` god
+  interface.
+- **Dependency Inversion**: `application` depends on port interfaces it defines itself;
+  `infrastructure` implements them, never the other way around.
+
+---
+
+## 3. KISS (Strict)
+
+- Prefer the simplest working solution that still respects the platform's non-negotiables
+  (idempotency, no dual-write, no distributed transaction, ambiguity → reconciliation, not
+  a false failure).
+- Avoid speculative generalization beyond what the roadmap phase (plan §17) actually needs.
+  Don't add Kafka before DS-005, Temporal before DS-006, a service mesh before DS-023.
+- Do not add a second ledger, a mirrored balance in Redis/Orchestrator, or a "just in case"
+  duplicate of FinLedger's accounting truth anywhere in PayHub.
+- Readable > clever. A reviewer familiar with FinLedger's conventions but new to a given
+  PayHub service should understand a use case in under a minute.
+
+Ask: "Would a senior engineer say this is overcomplicated for the current DS-0xx phase?" If yes → simplify.
+Ask: "Does this quietly assume FinLedger will call back into PayHub?" If yes → invert the flow (resolve first, call FinLedger second).
+Ask: "Does this store a monetary balance outside FinLedger?" If yes → reject; it's a projection at most, never a source of truth.
+Ask: "Am I about to fork or patch the FinLedger image?" If yes → stop; express the need as a REST call + config, or raise an ADR if genuinely impossible.
+
+---
+
+## 4. Structural Constraints (PayHub-specific, non-negotiable)
+
+- **Idempotency everywhere a command crosses a boundary.** Every mutating inbound request
+  requires an `Idempotency-Key`; `idempotency_record(tenant_id, operation, key,
+  request_hash, response_snapshot)` is written in the **same local transaction** as the
+  business mutation (plan §5.1). Never "check then insert" as two transactions.
+- **Inbox before action.** Every Kafka/RabbitMQ consumer deduplicates by `eventId` inside
+  the same DB transaction as the side effect it triggers (plan §5.2) — never best-effort
+  dedup after the fact.
+- **Outbox, never dual-write.** Any DB write that must also emit an event goes through the
+  transactional outbox in that service's own database — never a direct broker publish call
+  inside the method that writes the aggregate (plan §3.1, §5.3).
+- **No 2PC/XA, ever.** Cross-service consistency is achieved through sagas (Temporal for
+  the payment/refund workflow) and compensation — never a distributed transaction spanning
+  two services' databases (plan §4.2).
+- **Ambiguity is a state, not a verdict.** A rail timeout or lost connection transitions the
+  payment to `RECONCILIATION_REQUIRED` — it is never mapped directly to `FAILED_FINAL`
+  (plan §1.4, §4.1). Only a corroborated provider response may close an ambiguous state.
+- **Compensation is a new command, never a deletion.** `request reversal`, `refund`, and
+  Break resolutions are explicit business commands with their own audit trail — nothing is
+  rolled back by deleting or mutating a prior record (plan §1.3, §9.4).
+- **Each service owns its database.** No service reads another service's schema directly —
+  not even for a "quick read." Cross-service reads happen through the owning service's API
+  or through a Kafka-derived projection (Reporting) that is explicitly non-authoritative
+  (plan §3.1, §3.2).
+- **FinLedger's contract is read-only law.** `Idempotency-Key`, JWT scopes
+  (`ledger:read/write/admin`, `platform:admin`), `tenant_id` claim matching, and the
+  `409`/`403 TENANT_CLAIM_MISMATCH` semantics from FinLedger's `INTEGRATION_GUIDE.md` are
+  never reinterpreted or worked around locally — if a PayHub need doesn't fit that
+  contract, raise an ADR, don't patch around it.
+- **CQRS is non-authoritative by construction.** The Reporting service's projections always
+  expose `asOf` / staleness; nothing built on Kafka-derived data is ever treated as the
+  financial source of truth (plan §3.2, §8).
+- **Error classification is mandatory.** Every failure a client-facing service surfaces is
+  tagged `retryable`, `terminal`, or `ambiguous/reconcile` (plan §7.2) — an untagged
+  exception bubbling to a saga step is a defect, not an edge case to leave for later.
+- **Money is always `{ BigDecimal amount, Currency currency }`.** Never `double`/`float`,
+  consistent with FinLedger's own rule — PayHub never re-derives or re-rounds an amount
+  FinLedger has already posted.
+
+---
+
+## 5. Code Generation Workflow
+
+ALWAYS, in this order:
+
+1. Identify which bounded context / service this change belongs to (plan §1.2) — if it
+   spans two, that's a signal the boundary or the ubiquitous language needs revisiting
+   before writing code
+2. Define or reuse domain rules / entities / value objects (pure, no framework)
+3. Define the port (`port/in` use case interface, `port/out` dependencies it needs —
+   including `LedgerPort` if FinLedger is involved)
+4. Implement the use case against the port interfaces (mocked/faked in tests at this
+   stage)
+5. Implement infrastructure adapters (JPA mapper, outbox/inbox writer, Kafka/RabbitMQ
+   adapter, Temporal activity, `FinLedgerClient`, etc.)
+6. Wire dependencies in `config/`
+7. Add tests for business behavior _before_ calling the work done — domain invariants
+   first, then the use case, then the adapter integration test (Testcontainers)
+
+---
+
+## 6. Forbidden Patterns
+
+- God services (a `PaymentService` that does risk, fees, rail calls, and notifications)
+- Business logic in a BFF, API Gateway, controller, or event consumer
+- A concrete vendor SDK type (`KafkaTemplate`, `RedisTemplate`, Temporal's raw
+  `WorkflowClient`) appearing in a `domain` or `application` class signature
+- A mirrored/shadow balance anywhere outside FinLedger (Redis, Orchestrator DB, cache)
+- Direct calls to FinLedger's REST API from anywhere other than that service's
+  `LedgerPort` adapter
+- Forking, patching, or building a custom image of FinLedger to expose an SPI hook — the
+  integration boundary is REST + config, full stop (see `docs/adr/` entry on this)
+- 2PC/XA transactions spanning FinLedger and any PayHub service, or spanning two PayHub
+  services
+- Treating a Kafka-derived projection (Reporting) as authoritative for a financial decision
+- Mapping a rail timeout directly to a terminal failure state without going through
+  `RECONCILIATION_REQUIRED`
+- Introducing Istio/Linkerd, a second message broker, or Kubernetes before the roadmap
+  phase (plan §17) that calls for it
+- Global mutable state without a clear owner
+- Expanding a service's scope beyond what `docs/PLAN_PAYHUB.md` documents, without updating
+  that document (or an ADR) first
+
+---
+
+## 7. Refactoring Rule
+
+If existing code violates these rules (e.g., a direct FinLedger REST call outside
+`LedgerPort`, a dual-write instead of outbox, a terminal-failure mapping on an ambiguous
+rail response): refactor BEFORE extending. Do not stack new saga steps or new consumers on
+a design that already breaks idempotency, the outbox pattern, or the FinLedger integration
+boundary.
+
+---
+
+## 8. Testing Strategy (MANDATORY)
+
+Tests MUST be meaningful, not just present. Match the project's pyramid
+(`docs/PLAN_PAYHUB.md` §14): unit (domain) as the base, integration (DB, Kafka, Debezium,
+Temporal, Redis via Testcontainers), contract (REST/AsyncAPI), E2E sandbox (full EcoPay
+scenario), load, and codified chaos/game-day experiments.
+
+### HIGH PRIORITY
+
+- Payment state machine: every transition in plan §1.4 is tested, including the ones that
+  must be **rejected** (e.g., `SETTLED` directly from `RISK_PENDING`)
+- Idempotency: replay of the same request/message must produce exactly one effect,
+  including under concurrent duplicate submission
+- Saga compensation: every failure branch in plan §4.1's table (risk rejected, reserve
+  failed, rail rejected, rail timeout, settlement failure, notification failure) has a test
+  proving the correct compensation or non-action
+- Ambiguity handling: a simulated rail timeout must land in `RECONCILIATION_REQUIRED`, not
+  `FAILED_FINAL` — property-based test over injected failure modes where feasible
+- Outbox/inbox: a DB write must never leave an event permanently unpublished, and a
+  consumer must never double-apply a redelivered event
+- `LedgerPort` contract test: verifies PayHub sends `Idempotency-Key`, correct JWT scope,
+  and a selected `ruleSetKey` for `/splits` — never recomputes split arithmetic locally
+- Multi-tenant isolation: a tenant must never trigger a saga step or read a projection
+  belonging to another tenant
+
+### Do NOT over-test
+
+- Framework wiring, trivial getters, generated mappers
+- Third-party library internals (Temporal's own retry logic, Resilience4j's own circuit
+  breaker internals)
+
+### Test types
+
+- **Unit (primary):** domain logic per service, no DB/network
+- **Integration (selective):** use case + persistence, outbox/inbox, Kafka/RabbitMQ,
+  Temporal workflow execution — via Testcontainers, real Postgres/Kafka/Temporal, never
+  H2/embedded substitutes
+- **Contract:** each service's REST surface and each Kafka/AsyncAPI topic schema — must
+  never break silently for another PayHub service or for FinLedger's documented contract
+- **E2E (minimal):** the full EcoPay Network journey — create, risk, split, rail, settle,
+  reconcile, notify
+- **Chaos:** codified experiments (Toxiproxy/Chaos Mesh) with a stated hypothesis, expected
+  metric, and a check that no duplicate or lost financial effect occurred
+
+### Rules
+
+- Deterministic, readable, fast
+- Descriptive names (`should_transition_to_reconciliation_required_when_rail_times_out`)
+- AAA pattern (Arrange / Act / Assert)
+
+### Anti-patterns (FORBIDDEN)
+
+- Testing implementation details of an adapter instead of the port's contract
+- Over-mocking domain objects that are pure and cheap to instantiate directly
+- Skipping saga-compensation or idempotency tests because "the happy path passes"
+- Mocking `LedgerPort` in a way that hides whether `ruleSetKey` / rails / refunds calls
+  matched FinLedger's native contract
+
+### Coverage philosophy
+
+- High coverage AND meaningful assertions in each service's `domain`
+- Moderate in `application` (use case orchestration, saga steps)
+- Low in pure plumbing (`infrastructure` wiring, mappers)
+
+If code is hard to test → the design is wrong (likely a missing port, or a business rule
+leaking into an adapter or a Temporal activity) → fix the design first.
+
+---
+
+## 9. Linting & Code Quality
+
+- Use each service's linter/formatter when present
+- No dead code, no commented-out blocks
+- Functions short; avoid nesting > 2 levels (prefer early return)
+- One responsibility per function/class; prefer pure functions in `domain`
+- No silent failures; use explicit domain exceptions
+  (`AmbiguousSettlementException`, `IdempotencyKeyReusedException`, etc.), never a
+  swallowed exception
+- No unused dependencies; justify new deps in `docs/PLAN_PAYHUB.md` or an ADR, and confirm
+  they don't violate the FinLedger integration boundary or introduce a shadow ledger
+- Same patterns across services — a new consumer, saga activity, or adapter follows the
+  shape of an existing one in another service
+
+### Self-check before finishing a task
+
+- Layers respected? (`domain` still zero-framework, in this service?) If not → FIX
+- Business logic outside `domain`/`application`, or leaking into a BFF/consumer? → FIX
+- A direct FinLedger REST call outside `LedgerPort`? → FIX
+- A rail timeout mapped to a terminal state instead of `RECONCILIATION_REQUIRED`? → FIX
+- A dual-write instead of outbox, or a distributed transaction instead of a saga step? → FIX
+- Over-engineered relative to the current roadmap phase (plan §17)? → SIMPLIFY
+- Understandable in <30s? → SIMPLIFY
+- Idempotency, inbox/outbox, and compensation paths tested? → ADD tests if missing
+- Tests pass locally for the affected service(s)? If not → FIX before committing
+
+---
+
+## 10. CI/CD & Docker (engineering rules)
+
+### Test execution in CI
+
+- All tests run in CI exactly as they run locally — same profiles, same Testcontainers
+  images (Postgres, Kafka, Temporal, Redis), same JDK version. No CI-only test skips.
+- Integration tests use Testcontainers with real infra matching `platform/compose/`. Never
+  H2, never embedded substitutes.
+- ArchUnit tests run as part of the standard test phase per service — not optional.
+
+### Docker image rules (per service)
+
+- Each service's Dockerfile lives at `services/<name>/Dockerfile`, multi-stage build
+  (build stage with Maven/JDK, runtime stage with JRE only, non-root user).
+- A service must start with zero mandatory environment variables against
+  `platform/compose/docker-compose.yml` defaults. Production overrides via env/Secrets.
+- Every configurable value (datasource, broker endpoint, Temporal target, FinLedger base
+  URL) is documented in that service's README section.
+- No secrets baked into any image — ever, not even for local convenience.
+- Images are architecture-portable: `linux/amd64` + `linux/arm64` via `docker buildx`.
+
+### Forbidden CI/CD patterns
+
+- Skipping tests in any pipeline stage
+- Hard-coding secrets or credentials in workflow YAML
+- Publishing a Docker image from a branch other than `main`
+- Weakening branch protection or required checks without an ADR
+- Using `latest` as the only tag — every release image also carries a semver tag
+- Pinning FinLedger by `latest` instead of a semver/digest in `finledger/` config

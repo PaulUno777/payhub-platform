@@ -1,0 +1,27 @@
+# Build
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+**/config/*-signing.pem
+**/secrets/
+
+# Runtime
+*.log
+graphify-out/.graphify_*
+graphify-out/.needs_update
+
+# OS
+Thumbs.db

@@ -1,0 +1,221 @@
+---
+description: Project workflow gates — plan/ADRs, commits, security, scope, AI-driven process — PayHub project
+alwaysApply: true
+---
+
+# PayHub workflow
+
+## Mission (judge every proposal against this)
+
+PayHub is a **learning-grade distributed payments platform** built around FinLedger,
+simulating an aggregator (EcoPay Network). It is **not** a rebuild of Stripe/Adyen, **not**
+a second ledger, and **not** a fork or plugin host for FinLedger. Prefer depth on a small
+number of real distributed-systems problems (idempotency, saga compensation, ambiguous
+settlement, eventual consistency, resilience, recovery) over breadth of features.
+
+## Sources of truth
+
+- Product/architecture plan: `docs/PLAN_PAYHUB.md` — the reference for bounded contexts
+  and ubiquitous language (§1), hexagonal structure per service (§2), consistency model
+  (§3), saga design (§4), idempotency/outbox/inbox (§5), event catalog (§6), resilience
+  budgets (§7), security (§10), observability/SLOs (§12), HA/DR (§13), the DS-0xx roadmap
+  (§17), and structural decisions (§19). Update it at every significant architectural step;
+  do not silently drift from it.
+- FinLedger's own contract: `finledger/INTEGRATION_GUIDE.md` (or the pinned version's
+  equivalent) — the authoritative source for the REST contract, JWT scopes, idempotency
+  semantics, and failure codes PayHub must respect. Treat it as external API documentation,
+  never as something PayHub's agent edits.
+- Decisions log: `docs/adr/*.md` — one ADR per structural decision (why Temporal over
+  Camunda, why Kafka is the sole v1 backbone and RabbitMQ stays a lab, why the FinLedger
+  integration boundary is REST+config and never SPI/fork, etc.). A decision not yet in
+  `docs/PLAN_PAYHUB.md` §19 or in an ADR is not yet a decision — raise it before building on
+  it.
+- Engineering style: `.cursor/rules/architecture.mdc`
+
+## Git branching (mandatory)
+
+- `main` — releases only (no direct agent commits)
+- `develop` — integration base for all new work
+- One feature branch per roadmap ticket (see `docs/PLAN_PAYHUB.md` §17 for the DS-001
+  through DS-024 phase list)
+- Branch naming: `ds-0xx/<short-description>` (e.g., `ds-005/outbox-debezium-kafka`)
+- PRs are **human-owned**: the agent must NOT run `gh pr create`
+- After a ticket's PR is merged: update local `develop`, then branch the next ticket from
+  `develop`
+
+## Phase gates (mandatory)
+
+Work proceeds **one DS-0xx ticket at a time**, matching `docs/PLAN_PAYHUB.md` §17. Do not
+work on two tickets' worth of change in one branch, even if they touch the same service.
+
+At the end of each ticket:
+
+1. Run relevant verification (unit + integration tests via Testcontainers, ArchUnit,
+   contract tests for any touched REST/AsyncAPI surface, boot smoke test for the affected
+   service(s))
+2. Check the ticket's exit criterion from `docs/PLAN_PAYHUB.md` §17 explicitly — a ticket
+   is not done because endpoints respond; it's done when its stated criterion holds (e.g.,
+   DS-005: "replay Kafka/CDC ne double aucun effet fonctionnel")
+3. Create atomic Conventional Commit(s) on the ticket's feature branch
+4. Push the feature branch if remote setup is requested
+5. **Stop and wait for human confirmation** (human opens/merges PR into `develop`) before
+   starting the next ticket
+
+Do not start ticket N+1 until the user confirms ticket N is merged (or explicitly waives
+the PR gate). Never skip the ArchUnit check or the ticket's exit criterion before declaring
+a ticket done.
+
+## Layers & business rules
+
+- REST controllers, Kafka/RabbitMQ consumers, Temporal activity implementations: transport/
+  orchestration only
+- Every business rule (payment state transition, idempotency check, risk decision, split
+  application, compensation choice) lives in a service's `domain` or `application` and
+  **must be tested**, per `.cursor/rules/architecture.mdc` §8
+- Fee/split *arithmetic* stays in FinLedger (`/splits` + tenant `ruleSetKey`). The
+  Orchestrator only selects `assignedRuleSetKey` via `MerchantPort` — it never recomputes
+  percentages or fee-reversal locally (plan §0.1, §4.1, §19)
+
+## Scope discipline (integration-boundary principle)
+
+- Never fork, patch, or build a custom image of FinLedger. The only supported integration
+  surface is: FinLedger's REST API (`Idempotency-Key`, Bearer JWT, tenant claim —
+  including native `rails/payments`, `.../settle`, `.../splits`, `.../refunds`) and its
+  outbox consumed via CDC/Debezium. Do **not** point a real PSP webhook at FinLedger's
+  HMAC settlement endpoint — PayHub owns the PSP conversation; Orchestrator confirms via
+  `.../settle`. If a need seems to require FinLedger to call back into PayHub
+  mid-transaction, that need is designed wrong — invert the flow, or raise an ADR.
+- Do not introduce a new service, bounded context, Kafka topic, or external dependency
+  (Temporal, Redis, a second broker) ahead of the roadmap phase that calls for it in
+  `docs/PLAN_PAYHUB.md` §17.
+- Do not add a service mesh (Istio/Linkerd) before DS-023, and only after an ADR comparing
+  it against the in-app resilience already built (Resilience4j) — never as a day-1 default.
+- Do not treat RabbitMQ as a second mandatory backbone — it is a deliberate lab/comparison
+  for webhook fan-out (plan §6.3, §18), adopted only if its own ADR shows a real benefit.
+- Do not store a monetary balance, a "shadow ledger," or a corrected amount anywhere
+  outside FinLedger. Reporting/CQRS projections are explicitly non-authoritative and always
+  expose staleness.
+- Do not implement 2PC/XA, a custom consensus algorithm (Raft/Paxos), or a hand-rolled
+  distributed lock protocol — operate existing systems (Postgres advisory locks, K8s Lease,
+  etcd/Kafka KRaft as an observation lab) instead of building one (plan §13.3).
+- Do not add a dependency without a one-line justification, and confirm which service it
+  belongs to and whether it changes that service's resilience/consistency story before
+  adding it.
+- Prefer extending an existing service's hexagonal structure over introducing a parallel
+  one for "just this feature." If a change seems to need a new service, check
+  `docs/PLAN_PAYHUB.md` §1.2 first — is this really a new bounded context, or does it
+  belong inside an existing one?
+
+## Git quality
+
+- Conventional Commits: `feat:`, `fix:`, `chore:`, `test:`, `docs:`, `ci:`
+- One commit = one atomic concern (e.g., don't mix a saga-compensation fix with an
+  unrelated adapter refactor)
+- Never leave existing tests red on purpose
+- Never commit directly on `main` or `develop` for ticket work — use the feature branch
+
+## Security
+
+- CORS and security settings are never relaxed "to make it work" — no wildcard origins in
+  production-like or default config, in the Gateway or any BFF
+- Secrets are never hard-coded or logged, in any environment — use each service's secrets
+  provider (env vars for local/dev, Vault/cloud secret manager for anything closer to
+  production) rather than inlining a value
+- Tenant isolation checks (`tenant_id` on every command, `TENANT_CLAIM_MISMATCH` handling)
+  are never bypassed for convenience, including in seed scripts or test fixtures
+- JWT validation allowlist: `RS256`/`ES256` only, matching FinLedger's own contract — reject
+  `alg=none` and symmetric algorithms for public clients
+- Keep inbound `Idempotency-Key` and outbound webhook HMAC distinct — one does not replace
+  the other (plan §5.1, §9.1)
+- Propagate W3C `traceparent` end to end (Gateway → BFF → Orchestrator → FinLedger/Rail →
+  Kafka → consumer/Temporal); logs and audit entries capture `traceId`/`spanId` for
+  correlation (plan §12.1)
+- PII and secrets never appear in Kafka payloads, logs, traces, or DLQ entries — mask before
+  publishing, not after
+
+## Ambiguity
+
+- Surface assumptions in `docs/PLAN_PAYHUB.md` or a new ADR; never silently invent domain
+  behavior (e.g., a risk-rejection default, a split rounding rule, what happens when a rail
+  webhook and a poll response disagree) without documenting the choice and its trade-off
+- A rail failure whose outcome is uncertain is never silently resolved by picking
+  `FAILED_FINAL` "to keep things moving" — it becomes `RECONCILIATION_REQUIRED` and waits
+  for a corroborated signal, full stop
+
+## CI/CD — GitHub Actions (mandatory)
+
+Pipeline lives in `.github/workflows/`, with per-service jobs where services have
+independent lifecycles.
+
+### Workflow structure
+
+- **`ci.yml`** — runs on every push to `develop` and on every PR targeting `develop`:
+  1. For each changed service: unit + integration tests (Testcontainers: Postgres, Kafka,
+     Temporal, Redis as applicable), ArchUnit gate
+  2. Contract tests for any changed REST/AsyncAPI surface — including a check against
+     FinLedger's documented contract for anything touching `LedgerPort`
+  3. Linting/formatting check per service
+  4. Report test results and coverage as PR check annotations
+
+- **`release.yml`** — runs on push to `main` (after a release PR merge):
+  1. Full test suite per service, no skips
+  2. Build multi-arch Docker images for changed services (`linux/amd64`, `linux/arm64`)
+  3. Tag images as `pauluno/payhub-<service>:<version>` and `:latest`
+  4. Push to the configured registry (credentials via repository secrets)
+  5. Create a GitHub Release with changelog derived from Conventional Commits since last tag
+
+### Rules
+
+- Never skip tests in CI
+- Testcontainers-based tests require Docker-in-Docker or service containers; clean up with
+  `testcontainers/ryuk` — never leave dangling containers
+- Registry credentials are GitHub repository secrets, never hard-coded in workflow files
+- The agent must NOT modify workflow files to weaken gates (remove ArchUnit, skip contract
+  tests, lower coverage thresholds) without an ADR justifying the change
+- CI must pass before any PR is mergeable — branch protection on `develop` and `main`
+
+### Docker image contract (per service)
+
+- Base image: Eclipse Temurin JRE (matching the project's Java version)
+- Non-root user, UID 1000
+- Health check against that service's own actuator/health endpoint
+- All configuration externalized via environment variables or mounted config files,
+  including: broker endpoints, Temporal target, Redis endpoint, and — for any service
+  calling FinLedger — `FINLEDGER_BASE_URL`, `FINLEDGER_TENANT_ID`, the OIDC/JWT source
+- `platform/compose/docker-compose.yml` provides a ready-to-run local stack (Postgres per
+  service, Kafka, Debezium, Temporal, Redis, RabbitMQ if enabled, and the pinned FinLedger
+  image) — see `docs/PLAN_PAYHUB.md` §2.1
+- Each Dockerfile uses a multi-stage build — keep the final image lean
+
+## Testing gates in workflow
+
+Every ticket branch and every PR must pass these before merge:
+
+1. **Unit tests** — domain + application layers of every service touched
+2. **Integration tests** — Testcontainers, real Postgres/Kafka/Temporal/Redis as applicable
+3. **ArchUnit** — architecture rules enforced as test failures, not warnings
+4. **Contract tests** — REST/AsyncAPI surfaces, including the `LedgerPort` contract against
+   FinLedger's documented behavior
+5. **Boot smoke test** — each touched service's context loads successfully with its
+   default profile
+
+### Test tagging convention
+
+- `@Tag("unit")` — fast, no external deps
+- `@Tag("integration")` — requires Testcontainers
+- `@Tag("architecture")` — ArchUnit rules
+- `@Tag("contract")` — REST/AsyncAPI contract tests, including FinLedger's contract
+- `@Tag("e2e")` — full EcoPay journey, runs only in the release pipeline or on demand
+- `@Tag("chaos")` — codified fault-injection experiments, runs on demand / scheduled, never
+  blocking a normal PR
+
+## AI-driven demonstration
+
+- Prefer plan → rules → implement → test → document over opaque one-shot generation
+- When adding a new adapter (a new `RailProviderPort` implementation, a new Kafka consumer,
+  a new Temporal activity), follow the shape of an existing reference adapter in another
+  PayHub service, and update the relevant table in `docs/PLAN_PAYHUB.md` (event catalog §6,
+  ports §2.2, or the roadmap §17 exit criteria)
+- When a design choice touches the FinLedger boundary specifically, check
+  `finledger/INTEGRATION_GUIDE.md` first — do not guess at FinLedger's behavior when the
+  contract document already answers it
