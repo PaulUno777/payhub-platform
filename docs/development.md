@@ -28,8 +28,8 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | done |
 | DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | done |
 | DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects | `ds-007/processing-guarantees` | done |
-| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | in progress |
-| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | pending |
+| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | done |
+| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | in progress |
 | DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | pending |
 | DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | pending |
 | DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | pending |
