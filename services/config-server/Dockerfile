@@ -5,7 +5,8 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /workspace
 COPY . .
-RUN ./mvnw -B -pl services/config-server -am package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B -pl services/config-server -am package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update \
@@ -16,7 +17,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /workspace/services/config-server/target/*.jar /app/app.jar
 USER 1000
-EXPOSE 8888
+EXPOSE 8080 8081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD curl -fsS http://127.0.0.1:8888/actuator/health || exit 1
+  CMD curl -fsS http://127.0.0.1:8081/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
