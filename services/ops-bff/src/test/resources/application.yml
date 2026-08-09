@@ -6,15 +6,15 @@ spring:
       enabled: false
       import-check:
         enabled: false
-  autoconfigure:
-    exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
 management:
   endpoints:
     web:
       exposure:
         include: health,info
 payhub:
+  security:
+    issuer-uri: http://localhost:8090
   clients:
     merchant-service: http://localhost:8300
-    payment-orchestrator: http://localhost:8200
+    payment-orchestrator: http://localhost:8310
     reconciliation-service: http://localhost:8400

@@ -14,7 +14,7 @@ public record MerchantServiceProperties(
             merchantService = "http://localhost:8300";
         }
         if (paymentOrchestrator == null || paymentOrchestrator.isBlank()) {
-            paymentOrchestrator = "http://localhost:8200";
+            paymentOrchestrator = "http://localhost:8310";
         }
         if (reconciliationService == null || reconciliationService.isBlank()) {
             reconciliationService = "http://localhost:8400";

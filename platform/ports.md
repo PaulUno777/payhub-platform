@@ -21,9 +21,14 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 | `reporting-service` | 8410 | 8411 | 5438 |
 | `notification-service` | 8420 | 8421 | 5439 |
 | `temporal` | 7233 (gRPC) | — | 5440 (`postgres-temporal`) |
+| `zitadel` (profile `identity`) | 8090 | — | — (state in Cockroach) |
+| `cockroachdb` (profile `identity`, Zitadel only) | 26257 (SQL) | 8086 (UI) | — |
 
 Config: Spring Cloud Config Server (`config-server:8888`) serves [`platform/config/`](config/).  
 Profiles: `local` (IDE host ports), `compose` (in-network DNS).
+
+OIDC (DS-011): `docker compose --profile identity up -d` — see [`IDENTITY.md`](compose/IDENTITY.md).
+Issuer (host): `http://localhost:8090`.
 
 Kafka clients (Compose): `kafka:9092`. Schema Registry (Compose): `http://schema-registry:8081`.  
 Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.  

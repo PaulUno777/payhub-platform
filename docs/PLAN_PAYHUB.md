@@ -388,12 +388,17 @@ PayHub Reconciliation importe un statement rail idempotent, corrèle référence
 
 ## 10. Edge, sécurité et multi-tenancy
 
-*(inchangé vs v1, endpoints Ops BFF étendus)*
+*(endpoints Ops BFF étendus ; IdP local = Zitadel — ADR-007)*
 
+- Issuer OIDC local : Zitadel (`http://localhost:8090` en profil `identity` / DevContainer) ;
+  datastore IdP = CockroachDB single-node (**uniquement** Zitadel, jamais une DB métier PayHub).
+- JWT PayHub : `RS256`/`ES256` ; claims minimaux `sub` + `tenant_id` (UUID) pour l'isolation.
+- Gateway rejette toute requête API sans JWT valide **avant** routage vers un service métier.
 - `POST /ops/merchants/{id}/approve` / `/reject`
 - `POST /ops/payments/{id}/refunds` → déclenche `RefundWorkflow` (v1 : initié par un opérateur ; ouverture éventuelle côté Merchant BFF en self-service référencée dans `OPEN_QUESTIONS.md`, même commande Orchestrator, autz différente — jamais de duplication de workflow)
+- `GET/POST /ops/reconciliation/...` → proxy thin vers `reconciliation-service`
 - Endpoints breaks/DLQ déjà prévus, inchangés
-
+- FinLedger conserve son propre issuer (`internal` sandbox) — distinct du JWT edge PayHub.
 ---
 
 ## 11–16. Service discovery/K8s, Observabilité, HA/DR, Tests, CI/CD, Documentation
@@ -459,6 +464,7 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 | Outbox + CDC + inbox | Dual write, consumer naïf | Perte/doublon contrôlés |
 | Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
 | Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
+| IdP local = Zitadel (Go) + CockroachDB (état IdP seulement) | Keycloak sur Postgres ; Cockroach comme DB métier PayHub | Diversité d'écosystème + OIDC DevContainer ; Postgres reste la DB de chaque service PayHub (ADR-007) |
 
 ---
 

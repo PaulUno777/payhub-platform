@@ -58,6 +58,7 @@ class SubmitPaymentWebIT {
                 """.formatted(merchantId, tenantId);
 
         MvcResult first = mockMvc.perform(post("/api/v1/payments")
+                        .header("Authorization", "Bearer test-token")
                         .header("Idempotency-Key", "idem-web-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -69,6 +70,7 @@ class SubmitPaymentWebIT {
         String paymentId = payment.get("id").asString();
 
         mockMvc.perform(post("/api/v1/payments")
+                        .header("Authorization", "Bearer test-token")
                         .header("Idempotency-Key", "idem-web-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -76,7 +78,8 @@ class SubmitPaymentWebIT {
                 .andExpect(jsonPath("$.id").value(paymentId))
                 .andExpect(jsonPath("$.status").value("RISK_APPROVED"));
 
-        mockMvc.perform(get("/api/v1/payments/" + paymentId))
+        mockMvc.perform(get("/api/v1/payments/" + paymentId)
+                        .header("Authorization", "Bearer test-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RISK_APPROVED"));
 

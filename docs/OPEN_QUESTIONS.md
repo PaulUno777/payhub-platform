@@ -130,6 +130,16 @@ Dans FinLedger, **Send Tunnel** = label du sous-marchand sandbox. Dans PayHub, l
 stub s'appelle désormais **MmSandbox** pour éviter la collision. Ne pas réintroduire
 « Send Tunnel » comme nom de PSP.
 
+### Q17 — Mapping Zitadel org → PayHub `tenant_id` claim ?
+
+**Décision v1 (DS-011 / ADR-007) :** les access tokens PayHub portent un claim
+custom `tenant_id` (UUID string). Configuré côté Zitadel (metadata / action) pour les
+users Ops/Merchant de démo. Les services comparent ce claim à
+`X-PayHub-Tenant-Id` (ou au `tenantId` du body quand présent).
+
+**À lever :** si un vrai multi-org Zitadel doit dériver automatiquement le UUID FinLedger
+`SUB_MERCHANT` sans claim custom — hors exit DS-011.
+
 ## Comment utiliser ce registre
 
 - Nouvelle question ouverte pendant un ticket DS-0xx → ajouter une entrée ici avant de

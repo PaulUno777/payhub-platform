@@ -1,5 +1,15 @@
 spring:
   application:
     name: gateway
-  autoconfigure:
-    exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
+
+payhub:
+  security:
+    issuer-uri: ${PAYHUB_OIDC_ISSUER:http://localhost:8090}
+  gateway:
+    rate-limit:
+      requests-per-window: ${PAYHUB_GATEWAY_RATE_LIMIT:120}
+      window: PT1M
+    routes:
+      ops-bff: ${PAYHUB_GATEWAY_OPS_BFF:http://localhost:8220}
+      merchant-service: ${PAYHUB_GATEWAY_MERCHANT_SERVICE:http://localhost:8300}
+      payment-orchestrator: ${PAYHUB_GATEWAY_PAYMENT_ORCHESTRATOR:http://localhost:8310}

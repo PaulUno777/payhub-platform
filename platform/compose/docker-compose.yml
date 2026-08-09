@@ -273,5 +273,56 @@ services:
       retries: 3
       start_period: 45s
 
+  # --- DS-011 identity (OIDC) — profile: identity — ADR-007 --------------------
+  # Cockroach is Zitadel-only. Never a PayHub service database.
+  cockroachdb:
+    profiles: ["identity"]
+    image: cockroachdb/cockroach:v24.3.18
+    command: start-single-node --insecure --advertise-addr=cockroachdb
+    ports:
+      - "26257:26257"
+      - "8086:8080"
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health?ready=1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  zitadel:
+    profiles: ["identity"]
+    image: ghcr.io/zitadel/zitadel:v2.71.12
+    command: start-from-init --masterkeyFromEnv --tlsMode disabled
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    environment:
+      ZITADEL_MASTERKEY: "${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Chars!}"
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: "8090"
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_COCKROACH_HOST: cockroachdb
+      ZITADEL_DATABASE_COCKROACH_PORT: "26257"
+      ZITADEL_DATABASE_COCKROACH_DATABASE: zitadel
+      ZITADEL_DATABASE_COCKROACH_USER_USERNAME: root
+      ZITADEL_DATABASE_COCKROACH_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_COCKROACH_ADMIN_USERNAME: root
+      ZITADEL_DATABASE_COCKROACH_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: PayHub
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: "PayHubAdmin1!"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD", "zitadel", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
 volumes:
   finledger-config:
+  cockroach-data:
