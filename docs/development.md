@@ -38,7 +38,7 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | done |
 | DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | done |
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | done |
-| DS-018 | Container registry & release: GHCR multi-arch push via `release.yml`, image tagging contract | `ds-018/registry-release-workflow` | in progress |
+| DS-018 | Container registry & release: GHCR multi-arch push via `release.yml`, image tagging contract | `ds-018/registry-release-workflow` | done |
 | DS-019 | Kubernetes/GitOps: kind cluster, Services/DNS, policies, HPA/KEDA, PDB, secrets, progressive delivery | `ds-019/k8s-gitops` | pending |
 | DS-020 | Data safety: HA DB/Kafka, PITR, restore test, CDC recovery, expand/contract migrations | `ds-020/data-safety` | pending |
 | DS-021 | SRE: SLOs/error budgets, alerts, runbooks, postmortem template | `ds-021/sre-slo` | pending |

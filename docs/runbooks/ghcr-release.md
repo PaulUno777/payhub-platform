@@ -49,16 +49,15 @@ echo "$GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
 
 ## Exit criterion checklist (DS-018)
 
-- [ ] Tag `v0.1.0` pushed to `origin`
-- [ ] Actions workflow **Release** green for that tag
-- [ ] At least one image pullable outside CI:
+- [x] Tag `v0.1.0` pushed to `origin`
+- [x] Actions workflow **Release** green for that tag
+- [x] At least one image pullable outside CI:
 
 ```bash
 docker pull ghcr.io/pauluno777/payhub-payment-orchestrator:0.1.0
 ```
 
-When the pull succeeds, mark DS-018 **done** in `docs/development.md`. Do **not** start
-DS-019 (kind / GitOps) until this checklist is complete.
+DS-018 exit confirmed. Do **not** start DS-019 (kind / GitOps) until you explicitly open that ticket.
 
 ## Local build (unchanged)
 
