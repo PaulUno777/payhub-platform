@@ -1,5 +1,6 @@
 package com.payhub.orchestrator.infrastructure.persistence;
 
+import java.math.BigDecimal;
 import java.util.Currency;
 
 import com.payhub.orchestrator.domain.Money;
@@ -11,6 +12,7 @@ final class PaymentMapper {
     }
 
     static Payment toDomain(PaymentJpaEntity entity) {
+        BigDecimal refunded = entity.getRefundedAmount() == null ? BigDecimal.ZERO : entity.getRefundedAmount();
         return Payment.rehydrate(
                 entity.getId(),
                 entity.getMerchantId(),
@@ -18,6 +20,9 @@ final class PaymentMapper {
                 new Money(entity.getAmount(), Currency.getInstance(entity.getCurrency())),
                 entity.getClientReference(),
                 entity.getStatus(),
+                entity.getRailReference(),
+                entity.getInitiateJournalEntryId(),
+                refunded,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -32,6 +37,9 @@ final class PaymentMapper {
         entity.setCurrency(payment.money().currency().getCurrencyCode());
         entity.setClientReference(payment.clientReference());
         entity.setStatus(payment.status());
+        entity.setRailReference(payment.railReference());
+        entity.setInitiateJournalEntryId(payment.initiateJournalEntryId());
+        entity.setRefundedAmount(payment.refundedAmount());
         entity.setCreatedAt(payment.createdAt());
         entity.setUpdatedAt(payment.updatedAt());
         return entity;

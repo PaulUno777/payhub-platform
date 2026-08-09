@@ -36,8 +36,17 @@ public class PaymentJpaEntity {
     private String clientReference;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 32)
+    @Column(nullable = false, length = 40)
     private PaymentStatus status;
+
+    @Column(name = "rail_reference", length = 128)
+    private String railReference;
+
+    @Column(name = "initiate_journal_entry_id")
+    private UUID initiateJournalEntryId;
+
+    @Column(name = "refunded_amount", nullable = false, precision = 19, scale = 4)
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -62,6 +71,14 @@ public class PaymentJpaEntity {
     public void setClientReference(String clientReference) { this.clientReference = clientReference; }
     public PaymentStatus getStatus() { return status; }
     public void setStatus(PaymentStatus status) { this.status = status; }
+    public String getRailReference() { return railReference; }
+    public void setRailReference(String railReference) { this.railReference = railReference; }
+    public UUID getInitiateJournalEntryId() { return initiateJournalEntryId; }
+    public void setInitiateJournalEntryId(UUID initiateJournalEntryId) {
+        this.initiateJournalEntryId = initiateJournalEntryId;
+    }
+    public BigDecimal getRefundedAmount() { return refundedAmount; }
+    public void setRefundedAmount(BigDecimal refundedAmount) { this.refundedAmount = refundedAmount; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

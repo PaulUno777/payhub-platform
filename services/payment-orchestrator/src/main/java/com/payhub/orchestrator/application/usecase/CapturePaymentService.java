@@ -121,7 +121,7 @@ public class CapturePaymentService implements CapturePaymentUseCase {
         ));
 
         try {
-            payment.markSettlementPending();
+            payment.markSettlementPending(initiated.railReference(), initiated.initiateJournalEntryId());
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
