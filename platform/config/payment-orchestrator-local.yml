@@ -13,3 +13,10 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+payhub:
+  temporal:
+    enabled: true
+    target: localhost:7233
+  risk:
+    mode: http

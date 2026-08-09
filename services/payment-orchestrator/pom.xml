@@ -26,6 +26,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<temporal.version>1.27.1</temporal.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -123,6 +124,25 @@
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
 			<artifactId>mockwebserver</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>io.temporal</groupId>
+			<artifactId>temporal-sdk</artifactId>
+			<version>${temporal.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.temporal</groupId>
+			<artifactId>temporal-testing</artifactId>
+			<version>${temporal.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Required by temporal-testing InProcess gRPC server -->
+		<dependency>
+			<groupId>io.grpc</groupId>
+			<artifactId>grpc-inprocess</artifactId>
+			<version>1.80.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

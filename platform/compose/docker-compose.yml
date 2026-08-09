@@ -239,5 +239,39 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-temporal:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    ports:
+      - "5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres-temporal
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
 volumes:
   finledger-config:

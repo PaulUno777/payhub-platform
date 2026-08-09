@@ -20,9 +20,11 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 | `reconciliation-service` | 8400 | 8401 | 5437 |
 | `reporting-service` | 8410 | 8411 | 5438 |
 | `notification-service` | 8420 | 8421 | 5439 |
+| `temporal` | 7233 (gRPC) | — | 5440 (`postgres-temporal`) |
 
 Config: Spring Cloud Config Server (`config-server:8888`) serves [`platform/config/`](config/).  
 Profiles: `local` (IDE host ports), `compose` (in-network DNS).
 
 Kafka clients (Compose): `kafka:9092`. Schema Registry (Compose): `http://schema-registry:8081`.  
-Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.
+Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.  
+Temporal (Compose/host): `temporal:7233` / `localhost:7233`.

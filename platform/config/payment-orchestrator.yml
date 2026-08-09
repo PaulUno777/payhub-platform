@@ -11,3 +11,10 @@ payhub:
     risk-service: ${PAYHUB_CLIENTS_RISK_SERVICE:http://localhost:8320}
     rail-adapter-service: ${PAYHUB_CLIENTS_RAIL_ADAPTER_SERVICE:http://localhost:8330}
     merchant-service: ${PAYHUB_CLIENTS_MERCHANT_SERVICE:http://localhost:8300}
+  temporal:
+    enabled: false
+    target: ${TEMPORAL_TARGET:localhost:7233}
+    namespace: default
+    task-queue: payment-capture
+  risk:
+    mode: in-memory
