@@ -34,8 +34,8 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | done |
 | DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | done |
 | DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | done |
-| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | in progress |
-| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | pending |
+| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | done |
+| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | in progress |
 | DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | pending |
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | pending |
 | DS-018 | Kubernetes/GitOps: Services/DNS, policies, HPA/KEDA, PDB, secrets, progressive delivery | `ds-018/k8s-gitops` | pending |
@@ -153,8 +153,8 @@ curl https://start.spring.io/starter.zip \
   -d dependencies=web,data-jpa,postgresql,flyway,validation,actuator,testcontainers \
   -o rail-adapter-service.zip
 unzip -q rail-adapter-service.zip -d services/rail-adapter-service && rm rail-adapter-service.zip
-# Kafka added at DS-005. Resilience4j (no official starter) added at DS-015:
-#   io.github.resilience4j:resilience4j-spring-boot3
+# Kafka added at DS-005. Resilience4j added at DS-015 on payment-orchestrator:
+#   io.github.resilience4j:resilience4j-spring-boot4 (+ httpclient5 pools)
 
 # --- reconciliation-service -------------------------------------------------
 curl https://start.spring.io/starter.zip \
@@ -195,7 +195,7 @@ Dependency timing, made explicit so nothing gets added early "just in case":
 | Temporal SDK | payment-orchestrator | DS-006 (payment happy path) |
 | `data-redis` | reporting-service | DS-013 (CQRS) |
 | RabbitMQ (Compose profile `rabbitmq`) | lab only — not a service dependency | DS-014 (comparison lab; exit path = HTTP retries + Postgres `DEAD`) |
-| Resilience4j | rail-adapter-service (+ others as needed) | DS-015 (resilience) |
+| Resilience4j | payment-orchestrator (primary); rail-adapter as needed | DS-015 (resilience) |
 
 - `flyway` everywhere a service owns a Postgres schema — migrations are expand/contract
   from day one (plan §15.2).

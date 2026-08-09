@@ -356,7 +356,19 @@ Kafka remains the sole production event backbone. RabbitMQ is available under Co
 
 ## 7. Résilience, protection et limites de charge
 
-*(inchangé vs v1)* — budget de latence recalculé : la réponse synchrone `POST /payments` ne couvre plus que Gateway + BFF + Orchestrator + Risk (≈350–500ms sur un SLO de 2s), FinLedger étant désormais entièrement hors du chemin critique synchrone (voir §4.1).
+Budget de latence (sync `POST /payments`) : Gateway + BFF + Orchestrator + Risk ≈350–500ms sur un SLO de 2s ; FinLedger et le rail HTTP restent **hors** du chemin critique synchrone d'acceptation (saga Temporal / activités — §4.1).
+
+**In-app avant mesh** (DS-015, décision §19) : Resilience4j sur `payment-orchestrator` par dépendance outbound (`rail`, `finledger`, `risk`) :
+
+| Dépendance | Pool HTTP dédié | Bulkhead (max concurrent) | TimeLimiter (défaut) | CircuitBreaker | Retry |
+| --- | --- | --- | --- | --- | --- |
+| `rail` | `maxConnTotal=4` | 2 | 3s | failure-rate 50% / slow-call 2s | **non** (évite double retry avec Temporal ; timeout → `AMBIGUOUS`) |
+| `finledger` | `maxConnTotal=16` | 8 | 5s | idem | connexion / 5xx classifiés `retryable` seulement (max 2) |
+| `risk` | `maxConnTotal=8` | 4 | 1s | idem | max 2 sur erreurs retryable |
+
+Shedding / backpressure edge : rate-limit Gateway (DS-011). Bulkhead plein / CB open → fail-fast `retryable` (ledger/risk) ou rail `AMBIGUOUS` — jamais `FAILED_FINAL` sur timeout rail. Pas d'Istio/Linkerd en v1.
+
+Exit DS-015 : un rail lent **n'épuise pas** le pool FinLedger (pools + bulkheads séparés, prouvé sous charge concurrente).
 
 ---
 
