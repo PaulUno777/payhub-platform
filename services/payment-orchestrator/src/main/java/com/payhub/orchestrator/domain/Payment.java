@@ -98,6 +98,50 @@ public class Payment {
         touch();
     }
 
+    public void markRailSubmitted() {
+        requireStatus(PaymentStatus.RISK_APPROVED, "markRailSubmitted");
+        this.status = PaymentStatus.RAIL_SUBMITTED;
+        touch();
+    }
+
+    public void markFailedFinal() {
+        if (status == PaymentStatus.FAILED_FINAL) {
+            return;
+        }
+        if (status != PaymentStatus.RAIL_SUBMITTED) {
+            throw new IllegalPaymentStateException("Cannot mark FAILED_FINAL from status " + status);
+        }
+        this.status = PaymentStatus.FAILED_FINAL;
+        touch();
+    }
+
+    public void markReconciliationRequired() {
+        if (status == PaymentStatus.RECONCILIATION_REQUIRED) {
+            return;
+        }
+        if (status != PaymentStatus.RAIL_SUBMITTED && status != PaymentStatus.SETTLEMENT_PENDING) {
+            throw new IllegalPaymentStateException(
+                    "Cannot mark RECONCILIATION_REQUIRED from status " + status);
+        }
+        this.status = PaymentStatus.RECONCILIATION_REQUIRED;
+        touch();
+    }
+
+    public void markSettlementPending() {
+        requireStatus(PaymentStatus.RAIL_SUBMITTED, "markSettlementPending");
+        this.status = PaymentStatus.SETTLEMENT_PENDING;
+        touch();
+    }
+
+    public void markSettled() {
+        if (status == PaymentStatus.SETTLED) {
+            return;
+        }
+        requireStatus(PaymentStatus.SETTLEMENT_PENDING, "markSettled");
+        this.status = PaymentStatus.SETTLED;
+        touch();
+    }
+
     private void requireStatus(PaymentStatus expected, String action) {
         if (status != expected) {
             throw new IllegalPaymentStateException("Cannot " + action + " from status " + status);
