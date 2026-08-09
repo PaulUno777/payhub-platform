@@ -1,13 +1,75 @@
 openapi: 3.0.3
 info:
   title: ops-bff
-  version: 0.0.1
-  description: Stub contract for DS-002 scaffold — expand in later tickets.
+  version: 0.0.2
+  description: Ops BFF — thin proxy to merchant-service approve/reject/get (DS-004).
 paths:
   /actuator/health:
     get:
       summary: Health probe
       operationId: health
+      responses:
+        '200':
+          description: OK
+  /api/v1/merchants/{id}:
+    get:
+      summary: Proxy get merchant
+      operationId: getMerchant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /api/v1/merchants/{id}/approve:
+    post:
+      summary: Proxy approve merchant
+      operationId: approveMerchant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /api/v1/merchants/{id}/reject:
+    post:
+      summary: Proxy reject merchant
+      operationId: rejectMerchant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
       responses:
         '200':
           description: OK

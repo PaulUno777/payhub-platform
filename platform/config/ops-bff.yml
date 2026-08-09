@@ -3,3 +3,7 @@ spring:
     name: ops-bff
   autoconfigure:
     exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
+
+payhub:
+  clients:
+    merchant-service: ${PAYHUB_CLIENTS_MERCHANT_SERVICE:http://localhost:8300}
