@@ -23,12 +23,16 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 | `temporal` | 7233 (gRPC) | — | 5440 (`postgres-temporal`) |
 | `zitadel` (profile `identity`) | 8090 | — | — (state in Cockroach) |
 | `cockroachdb` (profile `identity`, Zitadel only) | 26257 (SQL) | 8086 (UI) | — |
+| `jaeger` (profile `observability`) | 16686 (UI) | 4317 OTLP gRPC / 4318 OTLP HTTP | — |
 
 Config: Spring Cloud Config Server (`config-server:8888`) serves [`platform/config/`](config/).  
 Profiles: `local` (IDE host ports), `compose` (in-network DNS).
 
 OIDC (DS-011): `docker compose --profile identity up -d` — see [`IDENTITY.md`](compose/IDENTITY.md).
 Issuer (host): `http://localhost:8090`.
+
+Observability (DS-012): `docker compose --profile observability up -d` — see [`OBSERVABILITY.md`](compose/OBSERVABILITY.md).
+OTLP HTTP (host): `http://localhost:4318/v1/traces`. Jaeger UI: `http://localhost:16686`.
 
 Kafka clients (Compose): `kafka:9092`. Schema Registry (Compose): `http://schema-registry:8081`.  
 Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.  

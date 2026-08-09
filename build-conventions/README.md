@@ -24,5 +24,5 @@ When changing a rule in one service, update the other nine the same way.
 ## Allowed shared technical concerns (later tickets)
 
 - Event envelope / AsyncAPI schemas under `contracts/`
-- W3C `traceparent` helpers
+- W3C `traceparent` helpers in `libraries/payhub-messaging` (`TraceParents`)
 - Test fixtures that are not domain models

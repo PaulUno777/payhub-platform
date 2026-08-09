@@ -7,6 +7,12 @@ spring:
       import-check:
         enabled: false
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
   endpoints:
     web:
       exposure:

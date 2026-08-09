@@ -8,8 +8,11 @@ import org.springframework.stereotype.Component;
 
 import com.payhub.messaging.outbox.OutboxWriter;
 import com.payhub.messaging.outbox.OutboxWriter.OutboxAppend;
+import com.payhub.messaging.tracing.TraceParents;
 import com.payhub.orchestrator.application.port.out.PaymentLifecyclePublisher;
 import com.payhub.orchestrator.domain.PaymentStatus;
+
+import io.micrometer.tracing.Tracer;
 
 /**
  * Writes payment.lifecycle.v1 to the transactional outbox (same TX as caller).
@@ -21,13 +24,16 @@ public class OutboxPaymentLifecyclePublisher implements PaymentLifecyclePublishe
     public static final String AGGREGATE_TYPE = "Payment";
 
     private final OutboxWriter outboxWriter;
+    private final Tracer tracer;
     private final String topic;
 
     public OutboxPaymentLifecyclePublisher(
             OutboxWriter outboxWriter,
+            Tracer tracer,
             @Value("${payhub.kafka.payment-lifecycle-topic:payment.lifecycle.v1}") String topic
     ) {
         this.outboxWriter = outboxWriter;
+        this.tracer = tracer;
         this.topic = topic;
     }
 
@@ -38,10 +44,10 @@ public class OutboxPaymentLifecyclePublisher implements PaymentLifecyclePublishe
         String payloadJson = """
                 {"paymentId":"%s","merchantId":"%s","tenantId":"%s","status":"%s"}
                 """.formatted(paymentId, merchantId, tenantId, status.name()).trim();
-        // Envelope fields are assembled at relay time; outbox stores the payload body + metadata.
+        String traceparentJson = jsonStringOrNull(TraceParents.current(tracer));
         String envelopeJson = """
-                {"eventId":"%s","eventType":"%s","schemaVersion":"1","occurredAt":"%s","producer":"payment-orchestrator","aggregateId":"%s","tenantId":"%s","traceparent":null,"causationId":null,"payload":%s}
-                """.formatted(eventId, EVENT_TYPE, now, paymentId, tenantId, payloadJson).trim();
+                {"eventId":"%s","eventType":"%s","schemaVersion":"1","occurredAt":"%s","producer":"payment-orchestrator","aggregateId":"%s","tenantId":"%s","traceparent":%s,"causationId":null,"payload":%s}
+                """.formatted(eventId, EVENT_TYPE, now, paymentId, tenantId, traceparentJson, payloadJson).trim();
 
         outboxWriter.append(new OutboxAppend(
                 eventId,
@@ -53,5 +59,12 @@ public class OutboxPaymentLifecyclePublisher implements PaymentLifecyclePublishe
                 tenantId,
                 now
         ));
+    }
+
+    private static String jsonStringOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return "null";
+        }
+        return "\"" + value + "\"";
     }
 }
