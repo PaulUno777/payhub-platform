@@ -3,3 +3,9 @@ spring:
     name: merchant-service
   autoconfigure:
     exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
+
+payhub:
+  finledger:
+    base-url: ${FINLEDGER_BASE_URL:http://localhost:8080}
+    aggregator-tenant-id: ${FINLEDGER_AGGREGATOR_TENANT_ID:00000000-0000-0000-0000-0000000000a1}
+    default-currency: USD

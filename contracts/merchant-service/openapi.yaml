@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: merchant-service
-  version: 0.0.1
-  description: Stub contract for DS-002 scaffold — expand in later tickets.
+  version: 0.0.2
+  description: Merchant onboarding API (DS-004).
 paths:
   /actuator/health:
     get:
@@ -11,3 +11,129 @@ paths:
       responses:
         '200':
           description: OK
+  /api/v1/merchants:
+    post:
+      summary: Register merchant (PENDING_REVIEW)
+      operationId: registerMerchant
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterMerchantRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchants/{id}:
+    get:
+      summary: Get merchant
+      operationId: getMerchant
+      parameters:
+        - $ref: '#/components/parameters/MerchantId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchants/{id}/approve:
+    post:
+      summary: Approve merchant (provisions FinLedger SUB_MERCHANT + wallets)
+      operationId: approveMerchant
+      parameters:
+        - $ref: '#/components/parameters/MerchantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Active merchant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+  /api/v1/merchants/{id}/reject:
+    post:
+      summary: Reject merchant (no FinLedger call)
+      operationId: rejectMerchant
+      parameters:
+        - $ref: '#/components/parameters/MerchantId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Rejected merchant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Merchant'
+components:
+  parameters:
+    MerchantId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    RegisterMerchantRequest:
+      type: object
+      required: [legalName, tier, assignedRuleSetKey]
+      properties:
+        legalName:
+          type: string
+        tier:
+          type: string
+          enum: [STANDARD, PREMIUM]
+        assignedRuleSetKey:
+          type: string
+    Merchant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        legalName:
+          type: string
+        status:
+          type: string
+        tier:
+          type: string
+        assignedRuleSetKey:
+          type: string
+        finLedgerTenantId:
+          type: string
+          format: uuid
+          nullable: true
+        merchantWalletId:
+          type: string
+          format: uuid
+          nullable: true
+        settlementWalletId:
+          type: string
+          format: uuid
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true

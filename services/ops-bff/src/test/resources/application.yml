@@ -13,3 +13,6 @@ management:
     web:
       exposure:
         include: health,info
+payhub:
+  clients:
+    merchant-service: http://localhost:8300
