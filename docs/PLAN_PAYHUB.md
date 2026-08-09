@@ -235,6 +235,7 @@ Chaque service possède une base PostgreSQL ou un schéma strictement isolé. Un
 
 - **CQRS léger :** Payment Orchestrator, Merchant Service et FinLedger ont des write models autoritaires; Reporting construit des projections à partir de Kafka et expose un `asOf`/consumer lag.
 - **Pas d'event sourcing global.** Event sourcing ciblé autorisé en POC sur la timeline `Break` ou l'historique workflow, sous ADR.
+- **DS-013 :** lectures Reporting renvoient toujours `asOf` + `stalenessMs` + `freshness: NON_AUTHORITATIVE` (jamais « à jour » par défaut). Redis cache-aside derrière `ProjectionCachePort`, invalidation à l'upsert projection.
 
 ### 3.3 CAP, PACELC, ACID et BASE
 

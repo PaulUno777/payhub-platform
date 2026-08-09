@@ -11,6 +11,7 @@ import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope;
 import com.payhub.reporting.application.port.in.ApplyPaymentLifecycleProjectionUseCase;
 import com.payhub.reporting.application.port.out.PaymentLifecycleProjectionStore;
 import com.payhub.reporting.application.port.out.PaymentLifecycleProjectionStore.PaymentLifecycleProjection;
+import com.payhub.reporting.application.port.out.ProjectionCachePort;
 
 @Service
 public class ApplyPaymentLifecycleProjectionService implements ApplyPaymentLifecycleProjectionUseCase {
@@ -19,13 +20,16 @@ public class ApplyPaymentLifecycleProjectionService implements ApplyPaymentLifec
 
     private final InboxStore inboxStore;
     private final PaymentLifecycleProjectionStore projectionStore;
+    private final ProjectionCachePort projectionCache;
 
     public ApplyPaymentLifecycleProjectionService(
             InboxStore inboxStore,
-            PaymentLifecycleProjectionStore projectionStore
+            PaymentLifecycleProjectionStore projectionStore,
+            ProjectionCachePort projectionCache
     ) {
         this.inboxStore = inboxStore;
         this.projectionStore = projectionStore;
+        this.projectionCache = projectionCache;
     }
 
     @Override
@@ -51,6 +55,7 @@ public class ApplyPaymentLifecycleProjectionService implements ApplyPaymentLifec
                 asOf
         ));
         inboxStore.save(envelope.eventId(), CONSUMER);
+        projectionCache.evictPayment(payload.tenantId(), payload.paymentId());
         return true;
     }
 }

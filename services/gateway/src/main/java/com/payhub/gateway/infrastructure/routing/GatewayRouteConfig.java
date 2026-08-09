@@ -18,7 +18,8 @@ public class GatewayRouteConfig {
     RouterFunction<ServerResponse> payhubRoutes(
             @Value("${payhub.gateway.routes.ops-bff}") String opsBff,
             @Value("${payhub.gateway.routes.merchant-service}") String merchantService,
-            @Value("${payhub.gateway.routes.payment-orchestrator}") String paymentOrchestrator
+            @Value("${payhub.gateway.routes.payment-orchestrator}") String paymentOrchestrator,
+            @Value("${payhub.gateway.routes.reporting-service}") String reportingService
     ) {
         return route("ops-bff")
                 .route(path("/ops/**"), http())
@@ -31,6 +32,10 @@ public class GatewayRouteConfig {
                 .and(route("payment-orchestrator")
                         .route(path("/api/v1/payments/**"), http())
                         .before(uri(paymentOrchestrator))
+                        .build())
+                .and(route("reporting-service")
+                        .route(path("/api/v1/reporting/**"), http())
+                        .before(uri(reportingService))
                         .build());
     }
 }

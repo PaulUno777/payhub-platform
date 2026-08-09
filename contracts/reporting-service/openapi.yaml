@@ -2,7 +2,9 @@ openapi: 3.0.3
 info:
   title: reporting-service
   version: 0.0.1
-  description: Stub contract for DS-002 scaffold — expand in later tickets.
+  description: |
+    Non-authoritative CQRS read models (DS-013). Responses always include asOf,
+    stalenessMs, and freshness=NON_AUTHORITATIVE — never financial truth.
 paths:
   /actuator/health:
     get:
@@ -11,3 +13,58 @@ paths:
       responses:
         '200':
           description: OK
+  /api/v1/reporting/payments/{paymentId}:
+    get:
+      summary: Payment lifecycle projection view
+      operationId: getPaymentLifecycleView
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-PayHub-Tenant-Id
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Projection with freshness metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentLifecycleView'
+        '404':
+          description: No projection for tenant/payment
+components:
+  schemas:
+    PaymentLifecycleView:
+      type: object
+      required: [paymentId, tenantId, merchantId, status, occurredAt, asOf, stalenessMs, freshness]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        asOf:
+          type: string
+          format: date-time
+        stalenessMs:
+          type: integer
+          format: int64
+        freshness:
+          type: string
+          enum: [NON_AUTHORITATIVE]

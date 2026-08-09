@@ -1,6 +1,10 @@
 spring:
   application:
     name: reporting-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 payhub:
   kafka:
@@ -10,3 +14,6 @@ payhub:
     consumer-group: reporting-ledger-journal-v1
     payment-lifecycle-topic: payment.lifecycle.v1
     payment-lifecycle-consumer-group: reporting-payment-lifecycle-v1
+  reporting:
+    cache:
+      ttl: ${PAYHUB_REPORTING_CACHE_TTL:PT30S}

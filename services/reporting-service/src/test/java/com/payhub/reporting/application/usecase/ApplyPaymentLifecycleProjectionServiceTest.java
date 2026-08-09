@@ -20,6 +20,7 @@ import com.payhub.messaging.inbox.InboxStore;
 import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope;
 import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope.PaymentStatusChangedPayload;
 import com.payhub.reporting.application.port.out.PaymentLifecycleProjectionStore;
+import com.payhub.reporting.application.port.out.ProjectionCachePort;
 
 @Tag("unit")
 @ExtendWith(MockitoExtension.class)
@@ -29,12 +30,14 @@ class ApplyPaymentLifecycleProjectionServiceTest {
     private InboxStore inboxStore;
     @Mock
     private PaymentLifecycleProjectionStore projectionStore;
+    @Mock
+    private ProjectionCachePort projectionCache;
 
     private ApplyPaymentLifecycleProjectionService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplyPaymentLifecycleProjectionService(inboxStore, projectionStore);
+        service = new ApplyPaymentLifecycleProjectionService(inboxStore, projectionStore, projectionCache);
     }
 
     @Test
@@ -47,6 +50,7 @@ class ApplyPaymentLifecycleProjectionServiceTest {
 
         verify(projectionStore).upsert(any());
         verify(inboxStore).save(envelope.eventId(), ApplyPaymentLifecycleProjectionService.CONSUMER);
+        verify(projectionCache).evictPayment(envelope.payload().tenantId(), envelope.payload().paymentId());
     }
 
     @Test
@@ -57,6 +61,7 @@ class ApplyPaymentLifecycleProjectionServiceTest {
         assertThat(service.execute(envelope)).isFalse();
         verify(projectionStore, never()).upsert(any());
         verify(inboxStore, never()).save(any(), any());
+        verify(projectionCache, never()).evictPayment(any(), any());
     }
 
     private static PaymentLifecycleEnvelope sample() {
