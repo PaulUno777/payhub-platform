@@ -341,7 +341,16 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 **Suppressions vs v1** : `tenant.events.v1` (aucun "control plane" PayHub réel — la création de tenant reste une opération `platform:admin` sur FinLedger, consommée via API, pas via topic) et `ledger.account-impact.v1` (Reporting dérive l'impact compte directement des postings de `ledger.journal-entry.v1`, sans second topic dédié tant que le besoin n'est pas prouvé — §0.2.8).
 
-### 6.2/6.3 — inchangé vs v1 (opérations Kafka, RabbitMQ comme laboratoire webhook)
+### 6.2 Kafka delivery operations (v1)
+
+- Producer path: Orchestrator transactional outbox → relay → `payment.lifecycle.v1` (key `paymentId`).
+- Consumers (Reporting, Notification, later Reconciliation) use inbox-before-action on `eventId`.
+- Finite in-listener retries (DefaultErrorHandler); dedicated `*.retry.*` / platform DLQ tooling is DS-016.
+- Notification (DS-014) does **not** rely on Kafka retry topics for merchant webhooks: it persists `WebhookDelivery` rows and retries HTTP delivery in-process; exhausted attempts become status `DEAD` (observable via `GET /api/v1/webhooks/dlq` / Ops `GET /ops/notifications/dlq`).
+
+### 6.3 RabbitMQ lab (optional — not the v1 backbone)
+
+Kafka remains the sole production event backbone. RabbitMQ is available under Compose profile `rabbitmq` for a **comparison lab** (work-queue fan-out vs Kafka + Postgres DEAD path). See [`platform/compose/RABBITMQ_LAB.md`](../platform/compose/RABBITMQ_LAB.md). Adoption as a second backbone requires an ADR; none is opened in DS-014.
 
 ---
 

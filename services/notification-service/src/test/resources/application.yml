@@ -7,7 +7,23 @@ spring:
       import-check:
         enabled: false
 management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
   endpoints:
     web:
       exposure:
         include: health,info
+payhub:
+  kafka:
+    enabled: false
+  notification:
+    webhooks:
+      dispatch-enabled: false
+      default-url: http://127.0.0.1:9/hooks
+      hmac-secret: test-hmac-secret
+      max-attempts: 5
+      base-backoff: PT1S

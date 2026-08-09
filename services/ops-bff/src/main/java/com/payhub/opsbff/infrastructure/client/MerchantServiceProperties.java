@@ -7,7 +7,8 @@ public record MerchantServiceProperties(
         String merchantService,
         String paymentOrchestrator,
         String reconciliationService,
-        String reportingService
+        String reportingService,
+        String notificationService
 ) {
 
     public MerchantServiceProperties {
@@ -22,6 +23,9 @@ public record MerchantServiceProperties(
         }
         if (reportingService == null || reportingService.isBlank()) {
             reportingService = "http://localhost:8410";
+        }
+        if (notificationService == null || notificationService.isBlank()) {
+            notificationService = "http://localhost:8420";
         }
     }
 }

@@ -10,3 +10,4 @@ payhub:
     payment-orchestrator: ${PAYHUB_CLIENTS_PAYMENT_ORCHESTRATOR:http://localhost:8310}
     reconciliation-service: ${PAYHUB_CLIENTS_RECONCILIATION_SERVICE:http://localhost:8400}
     reporting-service: ${PAYHUB_CLIENTS_REPORTING_SERVICE:http://localhost:8410}
+    notification-service: ${PAYHUB_CLIENTS_NOTIFICATION_SERVICE:http://localhost:8420}

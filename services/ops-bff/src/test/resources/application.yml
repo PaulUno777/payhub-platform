@@ -25,3 +25,4 @@ payhub:
     payment-orchestrator: http://localhost:8310
     reconciliation-service: http://localhost:8400
     reporting-service: http://localhost:8410
+    notification-service: http://localhost:8420

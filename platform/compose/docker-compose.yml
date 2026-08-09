@@ -352,6 +352,24 @@ services:
       retries: 3
       start_period: 15s
 
+  # --- DS-014 RabbitMQ lab — profile: rabbitmq -------------------------------
+  # Optional comparison lab only. Not the v1 event backbone — see RABBITMQ_LAB.md.
+  rabbitmq:
+    profiles: ["rabbitmq"]
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: payhub
+      RABBITMQ_DEFAULT_PASS: payhub
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
 volumes:
   finledger-config:
   cockroach-data:

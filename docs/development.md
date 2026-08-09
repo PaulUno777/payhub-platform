@@ -33,8 +33,8 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | done |
 | DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | done |
 | DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | done |
-| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | in progress |
-| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | pending |
+| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | done |
+| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | in progress |
 | DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | pending |
 | DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | pending |
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | pending |
@@ -184,17 +184,17 @@ curl https://start.spring.io/starter.zip \
   -d dependencies=web,data-jpa,postgresql,flyway,validation,actuator,testcontainers \
   -o notification-service.zip
 unzip -q notification-service.zip -d services/notification-service && rm notification-service.zip
-# AMQP (RabbitMQ) added at DS-014
+# Kafka + payhub-messaging added at DS-014 (HMAC webhooks). RabbitMQ = Compose lab only.
 ```
 
 Dependency timing, made explicit so nothing gets added early "just in case":
 
 | Dependency | Services | Added at |
 |---|---|---|
-| `kafka` (Spring Kafka) | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service | DS-005 (event backbone) |
+| `kafka` (Spring Kafka) | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service, notification-service | DS-005 (event backbone); notification at DS-014 |
 | Temporal SDK | payment-orchestrator | DS-006 (payment happy path) |
 | `data-redis` | reporting-service | DS-013 (CQRS) |
-| `amqp` (Spring AMQP) | notification-service | DS-014 (notifications) |
+| RabbitMQ (Compose profile `rabbitmq`) | lab only — not a service dependency | DS-014 (comparison lab; exit path = HTTP retries + Postgres `DEAD`) |
 | Resilience4j | rail-adapter-service (+ others as needed) | DS-015 (resilience) |
 
 - `flyway` everywhere a service owns a Postgres schema — migrations are expand/contract
