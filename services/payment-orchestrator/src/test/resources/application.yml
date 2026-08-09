@@ -16,3 +16,11 @@ management:
 payhub:
   finledger:
     base-url: http://127.0.0.1:9
+  clients:
+    risk-service: http://127.0.0.1:9
+    rail-adapter-service: http://127.0.0.1:9
+    merchant-service: http://127.0.0.1:9
+  temporal:
+    enabled: false
+  risk:
+    mode: in-memory
