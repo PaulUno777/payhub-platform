@@ -27,7 +27,6 @@ import com.payhub.orchestrator.application.port.out.RailPort.RailResult;
 import com.payhub.orchestrator.application.port.out.RailPort.RailSubmitCommand;
 import com.payhub.orchestrator.infrastructure.ledger.FinLedgerClient;
 import com.payhub.orchestrator.infrastructure.rail.HttpRailPort;
-import com.payhub.orchestrator.infrastructure.resilience.OutboundResilienceConfig.DependencyResilience;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -43,6 +42,7 @@ class RailBulkheadDoesNotStarveFinLedgerTest {
     private MockWebServer ledgerServer;
     private RailPort railPort;
     private LedgerPort ledgerPort;
+    private TestDependencyResilience resilienceFixture;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -62,7 +62,7 @@ class RailBulkheadDoesNotStarveFinLedgerTest {
         ResilienceProperties.DependencyConfig riskCfg = ResilienceProperties.DependencyConfig.defaults(
                 4, 2, 2, Duration.ofSeconds(1), Duration.ofSeconds(1), false
         );
-        DependencyResilience resilience = TestDependencyResilience.create(railCfg, ledgerCfg, riskCfg);
+        resilienceFixture = TestDependencyResilience.create(railCfg, ledgerCfg, riskCfg);
 
         RestClient railClient = OutboundResilienceConfig.buildClient(
                 railCfg,
@@ -73,12 +73,15 @@ class RailBulkheadDoesNotStarveFinLedgerTest {
                 ledgerServer.url("/").toString().replaceAll("/$", "")
         );
 
-        railPort = new HttpRailPort(railClient, resilience);
-        ledgerPort = new FinLedgerClient(ledgerClient, resilience);
+        railPort = new HttpRailPort(railClient, resilienceFixture.resilience());
+        ledgerPort = new FinLedgerClient(ledgerClient, resilienceFixture.resilience());
     }
 
     @AfterEach
     void tearDown() throws IOException {
+        if (resilienceFixture != null) {
+            resilienceFixture.close();
+        }
         railServer.shutdown();
         ledgerServer.shutdown();
     }

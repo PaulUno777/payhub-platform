@@ -1,5 +1,6 @@
 package com.payhub.messaging.tracing;
 
+import java.util.Objects;
 import java.util.function.Supplier;
 
 import io.micrometer.tracing.Span;
@@ -30,12 +31,16 @@ public final class TraceParents {
     }
 
     public static String format(TraceContext context) {
-        if (context == null || context.traceId() == null || context.spanId() == null) {
+        if (context == null) {
             return null;
         }
-        String traceId = normalizeTraceId(context.traceId());
+        String rawTraceId = context.traceId();
         String spanId = context.spanId();
-        if (traceId == null || spanId.length() != 16) {
+        if (rawTraceId == null || spanId == null || spanId.length() != 16) {
+            return null;
+        }
+        String traceId = normalizeTraceId(rawTraceId);
+        if (traceId == null) {
             return null;
         }
         String flags = Boolean.TRUE.equals(context.sampled()) ? "01" : "00";
@@ -62,6 +67,8 @@ public final class TraceParents {
     }
 
     public static <T> T withContinuedSpan(Tracer tracer, String traceparent, String spanName, Supplier<T> action) {
+        Objects.requireNonNull(tracer, "tracer");
+        Objects.requireNonNull(action, "action");
         Span span = startContinuedSpan(tracer, traceparent, spanName);
         try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
             return action.get();
@@ -72,6 +79,14 @@ public final class TraceParents {
     }
 
     public static Span startContinuedSpan(Tracer tracer, String traceparent, String spanName) {
+        Objects.requireNonNull(tracer, "tracer");
+        Objects.requireNonNull(spanName, "spanName");
+        // Micrometer builders use org.jspecify @NonNull; values below are validated by parse()/requireNonNull.
+        return startContinuedSpan0(tracer, traceparent, spanName);
+    }
+
+    @SuppressWarnings("null")
+    private static Span startContinuedSpan0(Tracer tracer, String traceparent, String spanName) {
         Span.Builder builder = tracer.spanBuilder().name(spanName).kind(Span.Kind.CONSUMER);
         Parsed parent = parse(traceparent);
         if (parent != null) {

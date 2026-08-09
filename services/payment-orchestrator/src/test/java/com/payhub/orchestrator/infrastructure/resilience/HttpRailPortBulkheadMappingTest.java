@@ -15,7 +15,6 @@ import com.payhub.orchestrator.application.port.out.RailPort.RailResult;
 import com.payhub.orchestrator.application.port.out.RailPort.RailSubmitCommand;
 import com.payhub.orchestrator.application.port.out.RailPort.RailSubmitResult;
 import com.payhub.orchestrator.infrastructure.rail.HttpRailPort;
-import com.payhub.orchestrator.infrastructure.resilience.OutboundResilienceConfig.DependencyResilience;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -25,9 +24,9 @@ class HttpRailPortBulkheadMappingTest {
 
     @Test
     void should_map_bulkhead_full_to_ambiguous() throws Exception {
-        MockWebServer server = new MockWebServer();
-        server.start();
-        try {
+        try (MockWebServer server = new MockWebServer();
+             TestDependencyResilience fixture = createFixture()) {
+            server.start();
             server.enqueue(new MockResponse()
                     .setBody("{\"outcome\":\"ACCEPTED\",\"providerReference\":\"p1\"}")
                     .addHeader("Content-Type", "application/json")
@@ -41,36 +40,60 @@ class HttpRailPortBulkheadMappingTest {
                     2, 2, 1, Duration.ZERO, Duration.ofSeconds(5), Duration.ofSeconds(1),
                     Duration.ofSeconds(10), 100f, 1, false
             );
-            DependencyResilience resilience = TestDependencyResilience.create(
-                    railCfg,
-                    ResilienceProperties.DependencyConfig.defaults(8, 4, 4, Duration.ofSeconds(2), Duration.ofSeconds(2), false),
-                    ResilienceProperties.DependencyConfig.defaults(4, 2, 2, Duration.ofSeconds(1), Duration.ofSeconds(1), false)
-            );
             HttpRailPort railPort = new HttpRailPort(
                     OutboundResilienceConfig.buildClient(railCfg, server.url("/").toString().replaceAll("/$", "")),
-                    resilience
+                    fixture.resilience()
             );
 
-            CountDownLatch holding = new CountDownLatch(1);
+            CountDownLatch entered = new CountDownLatch(1);
             CountDownLatch finished = new CountDownLatch(1);
             AtomicReference<RailSubmitResult> second = new AtomicReference<>();
 
             Thread holder = new Thread(() -> {
-                holding.countDown();
+                entered.countDown();
                 railPort.submit(new RailSubmitCommand(UUID.randomUUID(), "1.00", "XOF", "ACCEPT"));
                 finished.countDown();
             });
             holder.start();
-            assertThat(holding.await(2, TimeUnit.SECONDS)).isTrue();
-            Thread.sleep(100);
+            assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
+            // Wait until the holder has claimed the single bulkhead permit (metrics), not wall-clock sleep.
+            assertThat(awaitBulkheadOccupied(fixture, "rail", 2, TimeUnit.SECONDS)).isTrue();
 
             second.set(railPort.submit(new RailSubmitCommand(UUID.randomUUID(), "1.00", "XOF", "ACCEPT")));
             assertThat(second.get().outcome()).isEqualTo(RailResult.AMBIGUOUS);
 
             assertThat(finished.await(10, TimeUnit.SECONDS)).isTrue();
             holder.join(TimeUnit.SECONDS.toMillis(5));
-        } finally {
-            server.shutdown();
         }
+    }
+
+    private static TestDependencyResilience createFixture() {
+        ResilienceProperties.DependencyConfig railCfg = new ResilienceProperties.DependencyConfig(
+                2, 2, 1, Duration.ZERO, Duration.ofSeconds(5), Duration.ofSeconds(1),
+                Duration.ofSeconds(10), 100f, 1, false
+        );
+        return TestDependencyResilience.create(
+                railCfg,
+                ResilienceProperties.DependencyConfig.defaults(8, 4, 4, Duration.ofSeconds(2), Duration.ofSeconds(2), false),
+                ResilienceProperties.DependencyConfig.defaults(4, 2, 2, Duration.ofSeconds(1), Duration.ofSeconds(1), false)
+        );
+    }
+
+    private static boolean awaitBulkheadOccupied(
+            TestDependencyResilience fixture,
+            String name,
+            long timeout,
+            TimeUnit unit
+    ) throws InterruptedException {
+        long deadline = System.nanoTime() + unit.toNanos(timeout);
+        while (System.nanoTime() < deadline) {
+            int available = fixture.resilience().availableBulkheadPermits(name);
+            if (available == 0) {
+                return true;
+            }
+            Thread.yield();
+            TimeUnit.MILLISECONDS.sleep(10);
+        }
+        return false;
     }
 }

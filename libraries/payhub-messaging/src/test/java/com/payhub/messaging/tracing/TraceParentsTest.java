@@ -32,7 +32,11 @@ class TraceParentsTest {
         SimpleTracer consumerTracer = new SimpleTracer();
         String[] consumerTraceId = new String[1];
         TraceParents.withContinuedSpan(consumerTracer, envelopeTraceparent, "payment.lifecycle.consume", () -> {
-            consumerTraceId[0] = TraceParents.normalizeTraceId(consumerTracer.currentSpan().context().traceId());
+            Span span = consumerTracer.currentSpan();
+            if (span == null) {
+                throw new AssertionError("expected active consumer span");
+            }
+            consumerTraceId[0] = TraceParents.normalizeTraceId(span.context().traceId());
         });
 
         assertThat(consumerTraceId[0]).isEqualTo(publishedTraceId);

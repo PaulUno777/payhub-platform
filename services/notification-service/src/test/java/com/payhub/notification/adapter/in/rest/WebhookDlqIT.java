@@ -39,15 +39,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 @Import(TestcontainersConfiguration.class)
 class WebhookDlqIT {
 
-    private static final MockWebServer MERCHANT_SERVER = new MockWebServer();
-
-    static {
-        try {
-            MERCHANT_SERVER.start();
-        } catch (IOException ex) {
-            throw new ExceptionInInitializerError(ex);
-        }
-    }
+    private static MockWebServer merchantServer;
 
     @LocalServerPort
     private int port;
@@ -61,10 +53,12 @@ class WebhookDlqIT {
     private RestClient client;
 
     @DynamicPropertySource
-    static void webhookProps(DynamicPropertyRegistry registry) {
+    static void webhookProps(DynamicPropertyRegistry registry) throws IOException {
+        merchantServer = new MockWebServer();
+        merchantServer.start();
         registry.add("payhub.kafka.enabled", () -> "false");
         registry.add("payhub.notification.webhooks.dispatch-enabled", () -> "false");
-        registry.add("payhub.notification.webhooks.default-url", () -> MERCHANT_SERVER.url("/hooks").toString());
+        registry.add("payhub.notification.webhooks.default-url", () -> merchantServer.url("/hooks").toString());
         registry.add("payhub.notification.webhooks.hmac-secret", () -> "it-hmac-secret");
         registry.add("payhub.notification.webhooks.max-attempts", () -> "2");
         registry.add("payhub.notification.webhooks.base-backoff", () -> "PT0S");
@@ -72,7 +66,10 @@ class WebhookDlqIT {
 
     @AfterAll
     static void shutdownMerchant() throws IOException {
-        MERCHANT_SERVER.shutdown();
+        if (merchantServer != null) {
+            merchantServer.shutdown();
+            merchantServer = null;
+        }
     }
 
     @BeforeEach
@@ -82,8 +79,8 @@ class WebhookDlqIT {
 
     @Test
     void failed_delivery_ends_in_observable_dlq() throws Exception {
-        MERCHANT_SERVER.enqueue(new MockResponse().setResponseCode(500));
-        MERCHANT_SERVER.enqueue(new MockResponse().setResponseCode(500));
+        merchantServer.enqueue(new MockResponse().setResponseCode(500));
+        merchantServer.enqueue(new MockResponse().setResponseCode(500));
 
         UUID tenantId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
@@ -120,7 +117,7 @@ class WebhookDlqIT {
         assertThat(dlq.getFirst().attemptCount()).isEqualTo(2);
         assertThat(dlq.getFirst().lastError()).isNotBlank();
 
-        RecordedRequest first = MERCHANT_SERVER.takeRequest(2, TimeUnit.SECONDS);
+        RecordedRequest first = merchantServer.takeRequest(2, TimeUnit.SECONDS);
         assertThat(first).isNotNull();
         assertThat(first.getHeader("X-PayHub-Signature")).startsWith("sha256=");
         assertThat(first.getBody().readUtf8()).contains(paymentId.toString());

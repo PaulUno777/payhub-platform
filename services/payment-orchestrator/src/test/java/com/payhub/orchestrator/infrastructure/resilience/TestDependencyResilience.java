@@ -3,6 +3,7 @@ package com.payhub.orchestrator.infrastructure.resilience;
 import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -14,13 +15,26 @@ import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 
 /**
  * Builds a {@link OutboundResilienceConfig.DependencyResilience} for tests without Spring.
+ * Callers must {@link #close()} to shut down the scheduler.
  */
-public final class TestDependencyResilience {
+public final class TestDependencyResilience implements AutoCloseable {
 
-    private TestDependencyResilience() {
+    private final OutboundResilienceConfig.DependencyResilience resilience;
+    private final ScheduledExecutorService scheduler;
+
+    private TestDependencyResilience(
+            OutboundResilienceConfig.DependencyResilience resilience,
+            ScheduledExecutorService scheduler
+    ) {
+        this.resilience = resilience;
+        this.scheduler = scheduler;
     }
 
-    public static OutboundResilienceConfig.DependencyResilience permissive() {
+    public OutboundResilienceConfig.DependencyResilience resilience() {
+        return resilience;
+    }
+
+    public static TestDependencyResilience permissive() {
         return create(
                 new ResilienceProperties.DependencyConfig(
                         32, 16, 32, Duration.ZERO, Duration.ofSeconds(30), Duration.ofSeconds(5),
@@ -37,7 +51,7 @@ public final class TestDependencyResilience {
         );
     }
 
-    public static OutboundResilienceConfig.DependencyResilience create(
+    public static TestDependencyResilience create(
             ResilienceProperties.DependencyConfig rail,
             ResilienceProperties.DependencyConfig finledger,
             ResilienceProperties.DependencyConfig risk
@@ -67,8 +81,20 @@ public final class TestDependencyResilience {
         });
 
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
-        return new OutboundResilienceConfig.DependencyResilience(
-                bulkheads, breakers, timers, retries, scheduler, properties
-        );
+        OutboundResilienceConfig.DependencyResilience resilience =
+                new OutboundResilienceConfig.DependencyResilience(
+                        bulkheads, breakers, timers, retries, scheduler, properties
+                );
+        return new TestDependencyResilience(resilience, scheduler);
+    }
+
+    @Override
+    public void close() {
+        scheduler.shutdownNow();
+        try {
+            scheduler.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 }
