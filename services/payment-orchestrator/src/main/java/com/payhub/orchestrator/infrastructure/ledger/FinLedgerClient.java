@@ -75,6 +75,39 @@ public class FinLedgerClient implements LedgerPort {
         );
     }
 
+    @Override
+    public RefundResult refund(RefundCommand command) {
+        FinLedgerRefundResponse body = restClient.post()
+                .uri("/api/v1/tenants/{tenantId}/refunds", command.tenantId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", command.idempotencyKey())
+                .header("Authorization", "Bearer " + command.bearerToken())
+                .body(new FinLedgerRefundRequest(
+                        command.transactionReference(),
+                        command.originalJournalEntryId(),
+                        command.refundAmount(),
+                        command.currencyCode()
+                ))
+                .retrieve()
+                .body(FinLedgerRefundResponse.class);
+
+        if (body == null) {
+            throw new IllegalStateException("FinLedger returned empty refund response");
+        }
+        return new RefundResult(body.refundId(), body.status(), body.replayed());
+    }
+
+    @Override
+    public void putFeeConfig(PutFeeConfigCommand command) {
+        restClient.put()
+                .uri("/api/v1/tenants/{tenantId}/fee-config", command.tenantId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + command.bearerToken())
+                .body(new FinLedgerFeeConfigRequest(command.feeReversalPolicy()))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     record FinLedgerInitiateRequest(
             String railCode,
             String amount,
@@ -102,5 +135,23 @@ public class FinLedgerClient implements LedgerPort {
             String status,
             boolean replayed
     ) {
+    }
+
+    record FinLedgerRefundRequest(
+            String transactionReference,
+            UUID originalJournalEntryId,
+            String refundAmount,
+            String currencyCode
+    ) {
+    }
+
+    record FinLedgerRefundResponse(
+            UUID refundId,
+            String status,
+            boolean replayed
+    ) {
+    }
+
+    record FinLedgerFeeConfigRequest(String feeReversalPolicy) {
     }
 }
