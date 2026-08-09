@@ -72,8 +72,13 @@ inventés) :
   `finledger/.../presentation/rest/account/LedgerAccountController.java` ; result
   `CreateLedgerAccountResult` (`accountId`, …)
 
-**Reste ouvert :** schéma JSON champ par champ pour `…/splits` / `…/rails/payments`
-avant d'étendre `LedgerPort` au-delà de `initiate` (DS-006+).
+**Partiel (DS-008) — settle :** `POST …/rails/payments/{railReference}/settle`
+avec `Idempotency-Key` + Bearer JWT (corps vide côté PayHub ACL). Initiate reste
+inchangé (`railCode`, amount, currency, clearing/counterparty account ids,
+clientReference).
+
+**Reste ouvert :** schéma JSON champ par champ pour `…/splits` avant DS-009
+ApplySplit.
 
 ### Q10 — Où vit la table de lookup de `SelectSplitRuleKey` ?
 
