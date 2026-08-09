@@ -20,7 +20,7 @@ public class JpaIdempotencyStore implements IdempotencyStore {
     @Override
     public Optional<UUID> findPaymentId(String operation, String idempotencyKey) {
         return repository.findById(new IdempotencyId(operation, idempotencyKey))
-                .map(IdempotencyJpaEntity::getPaymentId);
+                .map(entity -> entity.getPaymentId());
     }
 
     @Override
