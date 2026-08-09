@@ -21,3 +21,9 @@ payhub:
     target: temporal:7233
   risk:
     mode: http
+  kafka:
+    enabled: true
+    bootstrap-servers: kafka:9092
+  outbox:
+    relay:
+      enabled: true

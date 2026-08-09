@@ -2,6 +2,7 @@ package com.payhub.orchestrator.application.usecase;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.payhub.orchestrator.application.dto.PaymentView;
 import com.payhub.orchestrator.application.dto.SubmitPaymentCommand;
 import com.payhub.orchestrator.application.port.out.IdempotencyStore;
+import com.payhub.orchestrator.application.port.out.PaymentLifecyclePublisher;
 import com.payhub.orchestrator.application.port.out.PaymentRepository;
 import com.payhub.orchestrator.application.port.out.RiskPort;
 import com.payhub.orchestrator.application.port.out.RiskPort.RiskDecision;
@@ -41,13 +43,21 @@ class SubmitPaymentServiceTest {
     private WorkflowPort workflowPort;
     @Mock
     private RiskPort riskPort;
+    @Mock
+    private PaymentLifecyclePublisher paymentLifecyclePublisher;
 
     private SubmitPaymentService service;
     private final Map<UUID, Payment> store = new HashMap<>();
 
     @BeforeEach
     void setUp() {
-        service = new SubmitPaymentService(paymentRepository, idempotencyStore, workflowPort, riskPort);
+        service = new SubmitPaymentService(
+                paymentRepository,
+                idempotencyStore,
+                workflowPort,
+                riskPort,
+                paymentLifecyclePublisher
+        );
         when(paymentRepository.save(any())).thenAnswer(inv -> {
             Payment p = inv.getArgument(0);
             store.put(p.id(), p);
@@ -68,6 +78,7 @@ class SubmitPaymentServiceTest {
         assertThat(view.status()).isEqualTo(PaymentStatus.RISK_APPROVED.name());
         verify(workflowPort, times(1)).startPaymentCapture(any());
         verify(idempotencyStore).save(any(), any(), any(), any());
+        verify(paymentLifecyclePublisher).publishStatusChanged(any(), any(), any(), eq(PaymentStatus.RISK_APPROVED));
     }
 
     @Test

@@ -24,3 +24,8 @@ payhub:
     enabled: false
   risk:
     mode: in-memory
+  kafka:
+    enabled: false
+  outbox:
+    relay:
+      enabled: false
