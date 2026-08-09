@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ import com.payhub.orchestrator.application.port.out.WorkflowPort.PaymentCaptureS
 import com.payhub.orchestrator.domain.IllegalPaymentStateException;
 import com.payhub.orchestrator.domain.Money;
 import com.payhub.orchestrator.domain.Payment;
+import com.payhub.orchestrator.domain.PaymentStatus;
 
 @Service
 public class SubmitPaymentService implements SubmitPaymentUseCase {
@@ -37,19 +39,22 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
     private final WorkflowPort workflowPort;
     private final RiskPort riskPort;
     private final PaymentLifecyclePublisher paymentLifecyclePublisher;
+    private final String sandboxMode;
 
     public SubmitPaymentService(
             PaymentRepository paymentRepository,
             IdempotencyStore idempotencyStore,
             WorkflowPort workflowPort,
             RiskPort riskPort,
-            PaymentLifecyclePublisher paymentLifecyclePublisher
+            PaymentLifecyclePublisher paymentLifecyclePublisher,
+            @Value("${payhub.rail.sandbox-mode:ACCEPT}") String sandboxMode
     ) {
         this.paymentRepository = paymentRepository;
         this.idempotencyStore = idempotencyStore;
         this.workflowPort = workflowPort;
         this.riskPort = riskPort;
         this.paymentLifecyclePublisher = paymentLifecyclePublisher;
+        this.sandboxMode = sandboxMode;
     }
 
     @Override
@@ -79,7 +84,8 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
                 saved.tenantId(),
                 saved.money().amount().toPlainString(),
                 saved.money().currency().getCurrencyCode(),
-                saved.clientReference()
+                saved.clientReference(),
+                sandboxMode
         ));
 
         saved.markRiskPending();
@@ -108,6 +114,11 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
                 persisted.tenantId(),
                 persisted.status()
         );
+
+        if (persisted.status() == PaymentStatus.RISK_APPROVED) {
+            workflowPort.signalContinueCapture(persisted.id());
+        }
+
         return PaymentView.from(persisted);
     }
 

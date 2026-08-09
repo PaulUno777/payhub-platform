@@ -6,7 +6,6 @@ public enum PaymentStatus {
     RISK_APPROVED,
     RISK_REJECTED,
     RISK_REVIEW,
-    // Placeholders for DS-008+
     RAIL_SUBMITTED,
     SETTLEMENT_PENDING,
     SETTLED,

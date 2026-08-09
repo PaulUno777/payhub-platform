@@ -30,7 +30,13 @@ class FinLedgerClientIdempotencyTest {
     void setUp() throws IOException {
         server = new MockWebServer();
         server.start();
-        FinLedgerProperties properties = new FinLedgerProperties(server.url("/").toString().replaceAll("/$", ""));
+        FinLedgerProperties properties = new FinLedgerProperties(
+                server.url("/").toString().replaceAll("/$", ""),
+                "test-token",
+                "MANUAL",
+                UUID.fromString("33333333-3333-3333-3333-333333333333"),
+                UUID.fromString("44444444-4444-4444-4444-444444444444")
+        );
         ledgerPort = new FinLedgerClient(RestClient.builder(), properties);
     }
 
@@ -93,6 +99,49 @@ class FinLedgerClientIdempotencyTest {
         assertThat(req2.getHeader("Idempotency-Key")).isEqualTo(key);
         assertThat(req1.getHeader("Authorization")).isEqualTo("Bearer test-token");
         assertThat(req1.getPath()).isEqualTo("/api/v1/tenants/" + tenantId + "/rails/payments");
+        assertThat(server.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    void should_confirm_settlement_with_idempotency_key_on_settle_path() throws Exception {
+        UUID tenantId = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+        String railReference = "rail-ref-settle-1";
+        String key = "payhub-rail-settle-demo";
+        String body = """
+                {
+                  "railReference": "%s",
+                  "status": "SETTLED",
+                  "replayed": %s
+                }
+                """.formatted(railReference, "%s");
+
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(body.formatted(false)));
+        server.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(body.formatted(true)));
+
+        var command = new LedgerPort.ConfirmSettlementCommand(tenantId, railReference, key, "test-token");
+        var first = ledgerPort.confirmSettlement(command);
+        var second = ledgerPort.confirmSettlement(command);
+
+        assertThat(first.status()).isEqualTo("SETTLED");
+        assertThat(first.replayed()).isFalse();
+        assertThat(second.replayed()).isTrue();
+        assertThat(second.railReference()).isEqualTo(railReference);
+
+        RecordedRequest req1 = server.takeRequest(1, TimeUnit.SECONDS);
+        RecordedRequest req2 = server.takeRequest(1, TimeUnit.SECONDS);
+        assertThat(req1).isNotNull();
+        assertThat(req2).isNotNull();
+        assertThat(req1.getHeader("Idempotency-Key")).isEqualTo(key);
+        assertThat(req1.getHeader("Authorization")).isEqualTo("Bearer test-token");
+        assertThat(req1.getPath()).isEqualTo(
+                "/api/v1/tenants/" + tenantId + "/rails/payments/" + railReference + "/settle"
+        );
         assertThat(server.getRequestCount()).isEqualTo(2);
     }
 }

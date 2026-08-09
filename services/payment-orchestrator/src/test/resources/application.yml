@@ -16,6 +16,7 @@ management:
 payhub:
   finledger:
     base-url: http://127.0.0.1:9
+    bearer-token: test-token
   clients:
     risk-service: http://127.0.0.1:9
     rail-adapter-service: http://127.0.0.1:9
@@ -24,6 +25,9 @@ payhub:
     enabled: false
   risk:
     mode: in-memory
+  rail:
+    mode: in-memory
+    sandbox-mode: ACCEPT
   kafka:
     enabled: false
   outbox:

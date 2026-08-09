@@ -94,7 +94,17 @@ class SubmitPaymentWebIT {
         @Bean
         @Primary
         WorkflowPort probingWorkflowPort(WorkflowStartProbe probe) {
-            return command -> probe.increment();
+            return new WorkflowPort() {
+                @Override
+                public void startPaymentCapture(PaymentCaptureStart command) {
+                    probe.increment();
+                }
+
+                @Override
+                public void signalContinueCapture(java.util.UUID paymentId) {
+                    // no-op in web IT; Temporal disabled
+                }
+            };
         }
     }
 

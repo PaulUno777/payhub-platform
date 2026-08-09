@@ -50,6 +50,31 @@ public class FinLedgerClient implements LedgerPort {
         );
     }
 
+    @Override
+    public ConfirmSettlementResult confirmSettlement(ConfirmSettlementCommand command) {
+        FinLedgerSettleResponse body = restClient.post()
+                .uri(
+                        "/api/v1/tenants/{tenantId}/rails/payments/{railReference}/settle",
+                        command.tenantId(),
+                        command.railReference()
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", command.idempotencyKey())
+                .header("Authorization", "Bearer " + command.bearerToken())
+                .body(new FinLedgerSettleRequest())
+                .retrieve()
+                .body(FinLedgerSettleResponse.class);
+
+        if (body == null) {
+            throw new IllegalStateException("FinLedger returned empty settle response");
+        }
+        return new ConfirmSettlementResult(
+                body.railReference() != null ? body.railReference() : command.railReference(),
+                body.status(),
+                body.replayed()
+        );
+    }
+
     record FinLedgerInitiateRequest(
             String railCode,
             String amount,
@@ -65,6 +90,16 @@ public class FinLedgerClient implements LedgerPort {
             String railReference,
             String status,
             UUID initiateJournalEntryId,
+            boolean replayed
+    ) {
+    }
+
+    record FinLedgerSettleRequest() {
+    }
+
+    record FinLedgerSettleResponse(
+            String railReference,
+            String status,
             boolean replayed
     ) {
     }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,7 +57,8 @@ class SubmitPaymentServiceTest {
                 idempotencyStore,
                 workflowPort,
                 riskPort,
-                paymentLifecyclePublisher
+                paymentLifecyclePublisher,
+                "ACCEPT"
         );
         when(paymentRepository.save(any())).thenAnswer(inv -> {
             Payment p = inv.getArgument(0);
@@ -77,6 +79,7 @@ class SubmitPaymentServiceTest {
 
         assertThat(view.status()).isEqualTo(PaymentStatus.RISK_APPROVED.name());
         verify(workflowPort, times(1)).startPaymentCapture(any());
+        verify(workflowPort).signalContinueCapture(view.id());
         verify(idempotencyStore).save(any(), any(), any(), any());
         verify(paymentLifecyclePublisher).publishStatusChanged(any(), any(), any(), eq(PaymentStatus.RISK_APPROVED));
     }
@@ -89,6 +92,7 @@ class SubmitPaymentServiceTest {
 
         assertThat(view.status()).isEqualTo(PaymentStatus.RISK_REJECTED.name());
         verify(workflowPort, times(1)).startPaymentCapture(any());
+        verify(workflowPort, never()).signalContinueCapture(any());
     }
 
     @Test

@@ -48,6 +48,55 @@ class PaymentTest {
     }
 
     @Test
+    void should_reach_failed_final_on_psp_reject_path() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markFailedFinal();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.FAILED_FINAL);
+    }
+
+    @Test
+    void should_reach_reconciliation_required_before_pending() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markReconciliationRequired();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.RECONCILIATION_REQUIRED);
+    }
+
+    @Test
+    void should_reach_settled_on_happy_path() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markSettlementPending();
+        payment.markSettled();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.SETTLED);
+    }
+
+    @Test
+    void should_reach_reconciliation_required_after_pending() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markSettlementPending();
+        payment.markReconciliationRequired();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.RECONCILIATION_REQUIRED);
+    }
+
+    @Test
+    void should_forbid_settled_from_rail_submitted_without_pending() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        assertThatThrownBy(payment::markSettled).isInstanceOf(IllegalPaymentStateException.class);
+    }
+
+    @Test
+    void should_forbid_failed_final_from_settlement_pending() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markSettlementPending();
+        assertThatThrownBy(payment::markFailedFinal).isInstanceOf(IllegalPaymentStateException.class);
+    }
+
+    @Test
     void should_forbid_negative_money() {
         assertThatThrownBy(() -> Money.of("-1.00", "USD"))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -55,5 +104,12 @@ class PaymentTest {
 
     private static Payment sample() {
         return Payment.create(UUID.randomUUID(), UUID.randomUUID(), Money.of("10.00", "USD"), "ord-1");
+    }
+
+    private static Payment riskApproved() {
+        Payment payment = sample();
+        payment.markRiskPending();
+        payment.approveRisk();
+        return payment;
     }
 }
