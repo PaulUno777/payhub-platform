@@ -210,8 +210,10 @@ Dependency timing, made explicit so nothing gets added early "just in case":
 2. Rename the generated main class to `<Service>Application`.
 3. Restructure into `domain/`, `application/`, `infrastructure/`, `adapter/` immediately —
    before writing any real class.
-4. Add the service's `Dockerfile` (multi-stage, non-root) and register it in
-   `platform/compose/docker-compose.yml`.
+4. Add the service's `Dockerfile` (multi-stage, non-root). Build **from repo root**:
+   `docker build -f services/<name>/Dockerfile -t pauluno/payhub-<name>:local .`
+   (reactor needs `libraries/` + sibling module POMs). Register the image in
+   `platform/compose/docker-compose.yml` when the ticket adds a compose service.
 5. Add an OpenAPI stub under `contracts/<service>/`.
 
 ### 3. Wire the aggregator reactor

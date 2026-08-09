@@ -3,6 +3,10 @@
 Local OpenTelemetry collector UI via **Jaeger all-in-one** (OTLP). Not a PayHub
 service database.
 
+Architecture note: tracing stays in **infrastructure / adapter / messaging** —
+never in `domain` (ArchUnit) and never a shared domain module. `TraceParents` in
+`libraries/payhub-messaging` is a technical envelope helper only.
+
 ## Start
 
 ```bash
@@ -18,20 +22,44 @@ docker compose --profile observability up -d jaeger
 
 ## Point PayHub services at Jaeger
 
-Spring Boot Micrometer OTLP (HTTP) expects the traces path:
+Spring Boot Micrometer OTLP (HTTP) expects the traces path.
+
+**Host / IDE** (`local` profile):
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+export TRACING_OTLP_ENABLED=true
 ```
 
-In Compose network (service DNS):
+**Compose network** (`compose` profile — see `application-compose.yml`):
 
 ```bash
 OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+TRACING_OTLP_ENABLED=true
 ```
 
-Shared Config Server defaults live in `platform/config/application.yml`
-(`management.tracing.sampling.probability`, `management.otlp.tracing.endpoint`).
+OTLP export defaults to **off** in Compose so services do not error-loop when the
+`observability` profile is down. Turn it on when Jaeger is up.
+
+Shared Config Server defaults also live in `platform/config/application.yml`
+(`management.tracing.sampling.probability`).
+
+## Docker images (learning path toward DS-018)
+
+Build **from the repository root** (monorepo reactor needs `libraries/` + all module
+POMs):
+
+```bash
+docker build -f services/payment-orchestrator/Dockerfile -t pauluno/payhub-payment-orchestrator:local .
+docker build -f services/reporting-service/Dockerfile -t pauluno/payhub-reporting-service:local .
+```
+
+In-container ports match Compose/K8s: API `8080`, management `8081` (health on
+`8081/actuator/health`). Host port mapping stays in `platform/ports.md`.
+
+For local Kubernetes later (DS-018): same images; set the two env vars above to the
+in-cluster Jaeger/OTel collector Service DNS (e.g. `http://jaeger:4318/v1/traces`).
+Do not bake endpoints into the image.
 
 ## FinLedger (optional, same collector)
 
@@ -53,3 +81,4 @@ full traces URL above.)
 - Kafka: `EventEnvelope.traceparent` on `payment.lifecycle.v1` (Reporting continues the span)
 
 Temporal workflow/activity span linking is out of scope for DS-012.
+Kubernetes Service / Deployment wiring is DS-018 — not started here.
