@@ -22,8 +22,8 @@ PRs are human-owned (agents do not open them unless asked).
 | Ticket | Phase | Branch slug | Status |
 |--------|-------|-------------|--------|
 | DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | done |
-| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | in progress |
-| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | pending |
+| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | done |
+| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | in progress |
 | DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject | `ds-004/merchant-service` | pending |
 | DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | pending |
 | DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | pending |
@@ -60,16 +60,21 @@ criterion from `PLAN_PAYHUB.md` §17 explicitly before considering it done.
 
 ---
 
-## Bootstrapping the base project (DS-002)
+## Bootstrapping the base project (DS-002 / DS-003)
 
-PayHub is **10 independently-releasable services** plus a shared build-conventions
-module. Generate each one from [start.spring.io](https://start.spring.io) individually,
-with only the starters that service actually needs **at DS-002** — Kafka, Temporal, Redis,
+PayHub is **10 independently-releasable services** plus `config-server` (Spring Cloud Config)
+and a shared `build-conventions` module. Port map: [`platform/ports.md`](../platform/ports.md).
+Config YAML (profiles `local` / `compose`): [`platform/config/`](../platform/config/).
+
+Generate each business service from [start.spring.io](https://start.spring.io) individually,
+with only the starters that service actually needs **at scaffold time** — Kafka, Temporal, Redis,
 and AMQP are added later, only in the ticket that actually introduces them (see the note
 after the commands). Don't add them up front; that was a mistake in an earlier draft of
 this guide and it contradicts the project's own progressive-complexity principle
 (plan §0.2.8).
 
+Config Server must be reachable for `compose` profile (or use `optional:configserver:` +
+classpath test YAML). Boot order locally: `config-server` → Postgres → apps / FinLedger.
 ### 0. Conventions used for every service
 
 - `groupId`: `com.payhub`

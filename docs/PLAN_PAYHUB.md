@@ -181,10 +181,11 @@ payhub-platform/
 │   └── threat-model.md
 ├── build-conventions/          # ArchUnit de base, Checkstyle/Spotless, fixtures de test partagées
 ├── services/
+│   ├── config-server/           # infra — Spring Cloud Config (pas un bounded context)
 │   ├── gateway/
 │   ├── merchant-bff/
 │   ├── ops-bff/
-│   ├── merchant-service/        # nouveau — onboarding, statut, tier, règle de split assignée
+│   ├── merchant-service/        # onboarding, statut, tier, règle de split assignée
 │   ├── payment-orchestrator/     # Payment + Refund workflows
 │   ├── risk-service/
 │   ├── rail-adapter-service/
@@ -193,6 +194,8 @@ payhub-platform/
 │   └── notification-service/
 ├── contracts/
 ├── platform/
+│   ├── ports.md                 # table ports host / noms logiques (registry DNS)
+│   ├── config/                  # YAML multi-profil servi par config-server
 │   ├── compose/
 │   ├── kafka/
 │   ├── k8s/

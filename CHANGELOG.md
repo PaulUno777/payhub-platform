@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- DS-003: Spring Cloud Config Server, standardized ports, FinLedger Compose + Orchestrator
+  `LedgerPort` / `FinLedgerClient` with idempotent replay contract test
 - DS-002 repo foundation: ten hexagonal Spring Boot 4.1.0 services, ArchUnit suites,
   Maven reactor, Compose Postgres stubs, CI workflow, contract stubs
 - DS-001 documentation bootstrap: context map, event catalog, CAP/PACELC ADR,
