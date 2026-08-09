@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- DS-005: FinLedger outbox → Debezium → Kafka (`ledger.journal-entry.v1`), Schema Registry,
+  AsyncAPI, reporting-service inbox consumer (duplicate delivery = one projection)
 - DS-004: Merchant aggregate (`PENDING_REVIEW` → `ACTIVE`/`REJECTED`), FinLedger
   `AccountProvisioningPort` (`SUB_MERCHANT` + wallets), Ops BFF approve/reject/get proxies
 - DS-003: Spring Cloud Config Server, standardized ports, FinLedger Compose + Orchestrator

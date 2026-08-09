@@ -103,6 +103,12 @@ l'argent PSP.
 **À lever :** seulement si DS-003 révèle un code d'erreur FinLedger qui impose un autre
 chemin.
 
+### Q16 — Schema Registry format (Avro vs JSON Schema) pour `ledger.journal-entry.v1` ?
+
+**Résolu (DS-005 / ADR-004).** JSON Schema via Confluent Schema Registry in Compose;
+consumers deserialize JSON without Avro codegen. Revisit only if a later ticket proves
+Avro/compatibility tooling is required.
+
 ### Q15 — Nommage : « Send Tunnel »
 
 Dans FinLedger, **Send Tunnel** = label du sous-marchand sandbox. Dans PayHub, le PSP

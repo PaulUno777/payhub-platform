@@ -8,3 +8,6 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+payhub:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}

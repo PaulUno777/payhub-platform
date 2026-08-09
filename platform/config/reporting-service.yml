@@ -1,3 +1,10 @@
 spring:
   application:
     name: reporting-service
+
+payhub:
+  kafka:
+    enabled: true
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    journal-entry-topic: ledger.journal-entry.v1
+    consumer-group: reporting-ledger-journal-v1

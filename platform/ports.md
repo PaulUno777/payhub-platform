@@ -7,6 +7,9 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 |--------------|----------|-----------------|---------------|
 | `finledger` | 8080 | 8081 | 5432 |
 | `config-server` | 8888 | — | — |
+| `kafka` | 9092 | — | — |
+| `schema-registry` | 8085 | — | — |
+| `debezium-connect` | 8083 | — | — |
 | `gateway` | 8200 | 8201 | — |
 | `merchant-bff` | 8210 | 8211 | — |
 | `ops-bff` | 8220 | 8221 | — |
@@ -20,3 +23,6 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 
 Config: Spring Cloud Config Server (`config-server:8888`) serves [`platform/config/`](config/).  
 Profiles: `local` (IDE host ports), `compose` (in-network DNS).
+
+Kafka clients (Compose): `kafka:9092`. Schema Registry (Compose): `http://schema-registry:8081`.  
+Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.
