@@ -13,13 +13,13 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestConstructor;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
@@ -37,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 @Tag("integration")
 @SpringBootTest
 @Testcontainers
+@TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 class JournalEntryKafkaDuplicateDeliveryTest {
 
     @Container
@@ -45,6 +46,20 @@ class JournalEntryKafkaDuplicateDeliveryTest {
 
     @Container
     static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.1"));
+
+    private final JournalEntryProjectionStore projectionStore;
+    private final ObjectMapper objectMapper;
+    private final KafkaConsumerProperties kafkaConsumerProperties;
+
+    JournalEntryKafkaDuplicateDeliveryTest(
+            JournalEntryProjectionStore projectionStore,
+            ObjectMapper objectMapper,
+            KafkaConsumerProperties kafkaConsumerProperties
+    ) {
+        this.projectionStore = projectionStore;
+        this.objectMapper = objectMapper;
+        this.kafkaConsumerProperties = kafkaConsumerProperties;
+    }
 
     @DynamicPropertySource
     static void kafkaProps(DynamicPropertyRegistry registry) {
@@ -55,15 +70,6 @@ class JournalEntryKafkaDuplicateDeliveryTest {
         registry.add("spring.cloud.config.enabled", () -> "false");
         registry.add("spring.cloud.config.import-check.enabled", () -> "false");
     }
-
-    @Autowired
-    private JournalEntryProjectionStore projectionStore;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private KafkaConsumerProperties kafkaConsumerProperties;
 
     @Test
     void should_apply_projection_once_when_same_event_published_twice() throws Exception {
