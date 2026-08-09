@@ -158,7 +158,7 @@ public class OutboundResilienceConfig {
         return buildClient(properties.risk(), baseUrl, observationRegistry);
     }
 
-    static RestClient buildClient(
+    public static RestClient buildClient(
             ResilienceProperties.DependencyConfig cfg,
             String baseUrl
     ) {

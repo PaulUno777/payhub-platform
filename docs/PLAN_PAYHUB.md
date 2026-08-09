@@ -458,7 +458,8 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 14. **DS-014 — Notifications :** webhooks signés, retries, DLQ; POC RabbitMQ documenté. *Exit : une livraison webhook échouée finit en DLQ observable, jamais perdue silencieusement.*
 15. **DS-015 — Résilience :** budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure. *Exit : un rail lent n'épuise pas le pool de connexions FinLedger (bulkhead prouvé sous charge).*
 16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. *Exit : un message poison est isolé sans bloquer les autres partitions.*
-17. **DS-017 — Chaos/load :** injection de pannes, blast radius, capacity report. *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
+17. **DS-017 — Chaos/load :** Toxiproxy cut on Orchestrator→FinLedger, capacity note in
+    [`platform/chaos/`](../platform/chaos/README.md). *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
 18. **DS-018 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
 19. **DS-019 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
 20. **DS-020 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*

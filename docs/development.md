@@ -37,7 +37,7 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | done |
 | DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | done |
 | DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | done |
-| DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | pending |
+| DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | done |
 | DS-018 | Kubernetes/GitOps: Services/DNS, policies, HPA/KEDA, PDB, secrets, progressive delivery | `ds-018/k8s-gitops` | pending |
 | DS-019 | Data safety: HA DB/Kafka, PITR, restore test, CDC recovery, expand/contract migrations | `ds-019/data-safety` | pending |
 | DS-020 | SRE: SLOs/error budgets, alerts, runbooks, postmortem template | `ds-020/sre-slo` | pending |
@@ -253,6 +253,7 @@ docker compose -f platform/compose/docker-compose.yml up -d postgres-orchestrato
 ./mvnw test
 ./mvnw -pl services/<name> test
 ./mvnw -pl services/<name> verify -Pintegration
+./mvnw -pl services/payment-orchestrator -Pchaos test
 ./mvnw -pl services/<name> spring-boot:run
 ./mvnw verify
 ```
@@ -266,6 +267,8 @@ docker compose -f platform/compose/docker-compose.yml up -d postgres-orchestrato
 - `@Tag("architecture")` — ArchUnit
 - `@Tag("e2e")` — full EcoPay journey (payment + refund), release pipeline / on-demand only
 - `@Tag("chaos")` — codified fault-injection experiments, on-demand / scheduled only
+  ([`platform/chaos/`](../platform/chaos/README.md)). Default Surefire excludes this tag;
+  run with `./mvnw -pl services/payment-orchestrator -Pchaos test`.
 
 ### Contract snapshot convention
 
