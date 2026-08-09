@@ -1,0 +1,15 @@
+server:
+  port: 8320
+management:
+  server:
+    port: 8321
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5435/risk
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

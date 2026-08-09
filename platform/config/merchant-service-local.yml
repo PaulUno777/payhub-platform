@@ -1,0 +1,15 @@
+server:
+  port: 8300
+management:
+  server:
+    port: 8301
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/merchant
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
