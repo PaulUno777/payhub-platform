@@ -12,7 +12,7 @@ public interface PaymentCaptureWorkflow {
     @WorkflowMethod
     void capture(PaymentCaptureInput input);
 
-    /** Reserved for DS-008+ to resume after RISK_APPROVED. */
+    /** Resume after RISK_APPROVED (sync risk on HTTP path). */
     @SignalMethod
     void continueCapture();
 
@@ -22,7 +22,13 @@ public interface PaymentCaptureWorkflow {
             UUID tenantId,
             String amount,
             String currencyCode,
-            String clientReference
+            String clientReference,
+            String sandboxMode
     ) {
+        public PaymentCaptureInput {
+            if (sandboxMode == null || sandboxMode.isBlank()) {
+                sandboxMode = "ACCEPT";
+            }
+        }
     }
 }

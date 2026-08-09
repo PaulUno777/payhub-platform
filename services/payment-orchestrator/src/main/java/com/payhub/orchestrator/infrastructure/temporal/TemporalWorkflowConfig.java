@@ -37,10 +37,15 @@ public class TemporalWorkflowConfig {
     }
 
     @Bean(destroyMethod = "shutdown")
-    WorkerFactory workerFactory(WorkflowClient workflowClient, TemporalProperties properties) {
+    WorkerFactory workerFactory(
+            WorkflowClient workflowClient,
+            TemporalProperties properties,
+            PaymentCaptureActivitiesImpl activities
+    ) {
         WorkerFactory factory = WorkerFactory.newInstance(workflowClient);
         Worker worker = factory.newWorker(properties.taskQueue());
         worker.registerWorkflowImplementationTypes(PaymentCaptureWorkflowImpl.class);
+        worker.registerActivitiesImplementations(activities);
         factory.start();
         return factory;
     }

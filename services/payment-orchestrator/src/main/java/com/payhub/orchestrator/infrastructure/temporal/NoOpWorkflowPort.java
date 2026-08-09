@@ -1,5 +1,7 @@
 package com.payhub.orchestrator.infrastructure.temporal;
 
+import java.util.UUID;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -15,5 +17,10 @@ public class NoOpWorkflowPort implements WorkflowPort {
     @Override
     public void startPaymentCapture(PaymentCaptureStart command) {
         // no-op for local tests without Temporal
+    }
+
+    @Override
+    public void signalContinueCapture(UUID paymentId) {
+        // no-op
     }
 }
