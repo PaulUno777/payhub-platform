@@ -1,0 +1,11 @@
+.git
+.github
+.cursor
+.claude
+.idea
+.vscode
+**/.DS_Store
+**/target
+**/*.iml
+graphify-out
+**/node_modules

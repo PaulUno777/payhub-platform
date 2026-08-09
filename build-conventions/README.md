@@ -11,7 +11,7 @@ Each service owns a FinLedger-shaped suite under
 | Class | Must enforce |
 |-------|----------------|
 | `ArchitectureTest` | `@Tag("architecture")`, `@AnalyzeClasses`, `ArchTests.in(...)` aggregator |
-| `DomainRules` | Domain free of Spring, JPA/Hibernate, Kafka, Temporal, Redis; domain ↛ other layers |
+| `DomainRules` | Domain free of Spring, JPA/Hibernate, Kafka, Temporal, Redis, Micrometer/OTel; domain ↛ other layers |
 | `ApplicationRules` | Application ↛ adapter, application ↛ infrastructure |
 | `AdapterRules` | Adapter ↛ infrastructure, adapter ↛ domain |
 | `InfrastructureRules` | Domain ↛ infrastructure; infrastructure ↛ adapter |
@@ -24,5 +24,17 @@ When changing a rule in one service, update the other nine the same way.
 ## Allowed shared technical concerns (later tickets)
 
 - Event envelope / AsyncAPI schemas under `contracts/`
-- W3C `traceparent` helpers
+- W3C `traceparent` helpers in `libraries/payhub-messaging` (`TraceParents`) — not domain
 - Test fixtures that are not domain models
+
+## Docker images (monorepo)
+
+Build from the **repository root** so the Maven reactor can resolve `libraries/*`
+and sibling module POMs:
+
+```bash
+docker build -f services/<name>/Dockerfile -t pauluno/payhub-<name>:local .
+```
+
+See `platform/compose/OBSERVABILITY.md` for OTLP env vars used the same way in
+Compose and (later) local Kubernetes.

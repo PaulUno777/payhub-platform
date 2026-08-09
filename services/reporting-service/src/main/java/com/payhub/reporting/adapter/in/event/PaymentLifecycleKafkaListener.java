@@ -9,9 +9,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import com.payhub.messaging.tracing.TraceParents;
 import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope;
 import com.payhub.reporting.application.port.in.ApplyPaymentLifecycleProjectionUseCase;
 
+import io.micrometer.tracing.Tracer;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -22,13 +24,16 @@ public class PaymentLifecycleKafkaListener {
 
     private final ApplyPaymentLifecycleProjectionUseCase applyPaymentLifecycleProjectionUseCase;
     private final ObjectMapper objectMapper;
+    private final Tracer tracer;
 
     public PaymentLifecycleKafkaListener(
             ApplyPaymentLifecycleProjectionUseCase applyPaymentLifecycleProjectionUseCase,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            Tracer tracer
     ) {
         this.applyPaymentLifecycleProjectionUseCase = applyPaymentLifecycleProjectionUseCase;
         this.objectMapper = objectMapper;
+        this.tracer = tracer;
     }
 
     @KafkaListener(
@@ -37,9 +42,11 @@ public class PaymentLifecycleKafkaListener {
     )
     public void onMessage(ConsumerRecord<String, String> record) throws IOException {
         PaymentLifecycleEnvelope envelope = objectMapper.readValue(record.value(), PaymentLifecycleEnvelope.class);
-        boolean applied = applyPaymentLifecycleProjectionUseCase.execute(envelope);
-        if (!applied) {
-            log.debug("Skipped duplicate payment lifecycle eventId={}", envelope.eventId());
-        }
+        TraceParents.withContinuedSpan(tracer, envelope.traceparent(), "payment.lifecycle.consume", () -> {
+            boolean applied = applyPaymentLifecycleProjectionUseCase.execute(envelope);
+            if (!applied) {
+                log.debug("Skipped duplicate payment lifecycle eventId={}", envelope.eventId());
+            }
+        });
     }
 }

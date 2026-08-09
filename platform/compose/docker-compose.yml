@@ -323,6 +323,24 @@ services:
       retries: 20
       start_period: 60s
 
+  # --- DS-012 observability — profile: observability ------------------------
+  # Jaeger all-in-one (OTLP gRPC/HTTP + UI). Not a PayHub service database.
+  jaeger:
+    profiles: ["observability"]
+    image: jaegertracing/all-in-one:1.67.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "16686:16686" # Jaeger UI
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   finledger-config:
   cockroach-data:

@@ -31,8 +31,8 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | done |
 | DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | done |
 | DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | done |
-| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | in progress |
-| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | pending |
+| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | done |
+| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | in progress |
 | DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | pending |
 | DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | pending |
 | DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | pending |
@@ -210,8 +210,10 @@ Dependency timing, made explicit so nothing gets added early "just in case":
 2. Rename the generated main class to `<Service>Application`.
 3. Restructure into `domain/`, `application/`, `infrastructure/`, `adapter/` immediately —
    before writing any real class.
-4. Add the service's `Dockerfile` (multi-stage, non-root) and register it in
-   `platform/compose/docker-compose.yml`.
+4. Add the service's `Dockerfile` (multi-stage, non-root). Build **from repo root**:
+   `docker build -f services/<name>/Dockerfile -t pauluno/payhub-<name>:local .`
+   (reactor needs `libraries/` + sibling module POMs). Register the image in
+   `platform/compose/docker-compose.yml` when the ticket adds a compose service.
 5. Add an OpenAPI stub under `contracts/<service>/`.
 
 ### 3. Wire the aggregator reactor

@@ -407,6 +407,10 @@ PayHub Reconciliation importe un statement rail idempotent, corrèle référence
 
 Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant des points non tranchés (ex. self-service refund côté Merchant BFF, usage futur de `SUSPENSE_HOLD` pour les payouts, PRO_RATA vs NO_REVERSE si le produit évolue).
 
+### 12 (stub) — Tracing DS-012
+
+PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot-micrometer-tracing-opentelemetry`) with W3C `traceparent` on HTTP and on Kafka `EventEnvelope.traceparent`. Local collector: Compose profile `observability` (Jaeger all-in-one OTLP) — see `platform/compose/OBSERVABILITY.md`. Temporal span linking is out of scope for DS-012.
+
 ---
 
 ## 17. Roadmap de développement (renuméroté)
