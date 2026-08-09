@@ -29,6 +29,7 @@ import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope;
 import com.payhub.reporting.application.dto.PaymentLifecycleEnvelope.PaymentStatusChangedPayload;
 import com.payhub.reporting.application.port.out.PaymentLifecycleProjectionStore;
 import com.payhub.reporting.infrastructure.messaging.KafkaConsumerProperties;
+import com.redis.testcontainers.RedisContainer;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,6 +45,9 @@ class PaymentLifecycleKafkaDuplicateDeliveryTest {
 
     @Container
     static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.1"));
+
+    @Container
+    static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7.4-alpine"));
 
     private final PaymentLifecycleProjectionStore projectionStore;
     private final ObjectMapper objectMapper;
@@ -66,6 +70,8 @@ class PaymentLifecycleKafkaDuplicateDeliveryTest {
         registry.add("payhub.kafka.payment-lifecycle-topic", () -> "payment.lifecycle.v1");
         registry.add("payhub.kafka.payment-lifecycle-consumer-group", () -> "reporting-lifecycle-it-" + UUID.randomUUID());
         registry.add("payhub.kafka.consumer-group", () -> "reporting-journal-it-" + UUID.randomUUID());
+        registry.add("spring.data.redis.host", redis::getRedisHost);
+        registry.add("spring.data.redis.port", () -> String.valueOf(redis.getRedisPort()));
         registry.add("spring.cloud.config.enabled", () -> "false");
         registry.add("spring.cloud.config.import-check.enabled", () -> "false");
     }

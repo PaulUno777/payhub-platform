@@ -28,3 +28,4 @@ payhub:
       ops-bff: http://127.0.0.1:9
       merchant-service: http://127.0.0.1:9
       payment-orchestrator: http://127.0.0.1:9
+      reporting-service: http://127.0.0.1:9

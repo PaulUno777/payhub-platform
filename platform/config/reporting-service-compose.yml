@@ -3,6 +3,10 @@ spring:
     url: jdbc:postgresql://postgres-reporting:5432/reporting
     username: ${DB_USERNAME:payhub}
     password: ${DB_PASSWORD:payhub}
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
   jpa:
     hibernate:
       ddl-auto: validate

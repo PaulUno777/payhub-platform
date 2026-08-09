@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record MerchantServiceProperties(
         String merchantService,
         String paymentOrchestrator,
-        String reconciliationService
+        String reconciliationService,
+        String reportingService
 ) {
 
     public MerchantServiceProperties {
@@ -18,6 +19,9 @@ public record MerchantServiceProperties(
         }
         if (reconciliationService == null || reconciliationService.isBlank()) {
             reconciliationService = "http://localhost:8400";
+        }
+        if (reportingService == null || reportingService.isBlank()) {
+            reportingService = "http://localhost:8410";
         }
     }
 }

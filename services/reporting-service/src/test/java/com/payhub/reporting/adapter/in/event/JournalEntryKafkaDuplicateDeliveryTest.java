@@ -31,6 +31,7 @@ import com.payhub.reporting.application.dto.JournalEntryEnvelope.PostingSummary;
 import com.payhub.reporting.application.dto.JournalEntryEnvelope.TransactionPostedPayload;
 import com.payhub.reporting.application.port.out.JournalEntryProjectionStore;
 import com.payhub.reporting.infrastructure.messaging.KafkaConsumerProperties;
+import com.redis.testcontainers.RedisContainer;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,6 +47,9 @@ class JournalEntryKafkaDuplicateDeliveryTest {
 
     @Container
     static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka-native:3.8.1"));
+
+    @Container
+    static RedisContainer redis = new RedisContainer(DockerImageName.parse("redis:7.4-alpine"));
 
     private final JournalEntryProjectionStore projectionStore;
     private final ObjectMapper objectMapper;
@@ -67,6 +71,8 @@ class JournalEntryKafkaDuplicateDeliveryTest {
         registry.add("payhub.kafka.bootstrap-servers", kafka::getBootstrapServers);
         registry.add("payhub.kafka.journal-entry-topic", () -> "ledger.journal-entry.v1");
         registry.add("payhub.kafka.consumer-group", () -> "reporting-it-" + UUID.randomUUID());
+        registry.add("spring.data.redis.host", redis::getRedisHost);
+        registry.add("spring.data.redis.port", () -> String.valueOf(redis.getRedisPort()));
         registry.add("spring.cloud.config.enabled", () -> "false");
         registry.add("spring.cloud.config.import-check.enabled", () -> "false");
     }

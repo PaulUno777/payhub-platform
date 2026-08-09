@@ -20,6 +20,7 @@ In-network, every PayHub app and FinLedger listen on **8080** (API) and **8081**
 | `reconciliation-service` | 8400 | 8401 | 5437 |
 | `reporting-service` | 8410 | 8411 | 5438 |
 | `notification-service` | 8420 | 8421 | 5439 |
+| `redis` (Reporting cache-aside, DS-013) | 6379 | — | — |
 | `temporal` | 7233 (gRPC) | — | 5440 (`postgres-temporal`) |
 | `zitadel` (profile `identity`) | 8090 | — | — (state in Cockroach) |
 | `cockroachdb` (profile `identity`, Zitadel only) | 26257 (SQL) | 8086 (UI) | — |
@@ -36,4 +37,5 @@ OTLP HTTP (host): `http://localhost:4318/v1/traces`. Jaeger UI: `http://localhos
 
 Kafka clients (Compose): `kafka:9092`. Schema Registry (Compose): `http://schema-registry:8081`.  
 Host Schema Registry: `http://localhost:8085`. CDC connector API: `http://localhost:8083`.  
-Temporal (Compose/host): `temporal:7233` / `localhost:7233`.
+Temporal (Compose/host): `temporal:7233` / `localhost:7233`.  
+Redis (Compose/host, DS-013): `redis:6379` / `localhost:6379`.
