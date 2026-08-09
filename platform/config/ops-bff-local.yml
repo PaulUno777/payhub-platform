@@ -1,0 +1,5 @@
+server:
+  port: 8220
+management:
+  server:
+    port: 8221

@@ -43,8 +43,8 @@ From `openapi-paths.json` (FL-160):
 - `POST /api/v1/tenants/{tenantId}/refunds`
 - `PUT  /api/v1/tenants/{tenantId}/split-rules/{ruleSetKey}`
 - `PUT  /api/v1/tenants/{tenantId}/fee-config`
-- `POST /api/v1/tenants/{tenantId}/accounts` — merchant provisioning
-- `POST /api/v1/tenants` — only if PayHub maps merchants to FinLedger tenants
+- `POST /api/v1/tenants` — Merchant activation creates FinLedger `SUB_MERCHANT` (Q14 / DS-001)
+- `POST /api/v1/tenants/{tenantId}/accounts` — wallets under that sub-merchant tenant
 
 Do **not** point MmSandbox webhooks at
 `…/rails/webhooks/settlement` (FinLedger HMAC). Orchestrator settles via JWT

@@ -1,0 +1,113 @@
+openapi: 3.0.3
+info:
+  title: payment-orchestrator
+  version: 0.0.2
+  description: Payment submit API (DS-006) — sync path ends at RISK_APPROVED; Temporal workflow started.
+paths:
+  /actuator/health:
+    get:
+      summary: Health probe
+      operationId: health
+      responses:
+        '200':
+          description: OK
+  /api/v1/payments:
+    post:
+      summary: Submit payment (idempotent; CREATED → RISK_APPROVED on happy path)
+      operationId: submitPayment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitPaymentRequest'
+      responses:
+        '201':
+          description: Created (typically RISK_APPROVED)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+  /api/v1/payments/{id}:
+    get:
+      summary: Get payment
+      operationId: getPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Not found
+components:
+  parameters:
+    PaymentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    SubmitPaymentRequest:
+      type: object
+      required: [merchantId, tenantId, amount, currencyCode, clientReference]
+      properties:
+        merchantId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          example: "25.00"
+        currencyCode:
+          type: string
+          example: USD
+        clientReference:
+          type: string
+    Payment:
+      type: object
+      required: [id, merchantId, tenantId, amount, currency, clientReference, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        currency:
+          type: string
+        clientReference:
+          type: string
+        status:
+          type: string
+          enum:
+            - CREATED
+            - RISK_PENDING
+            - RISK_APPROVED
+            - RISK_REJECTED
+            - RISK_REVIEW
+            - RAIL_SUBMITTED
+            - SETTLEMENT_PENDING
+            - SETTLED
+            - FAILED_FINAL
+            - RECONCILIATION_REQUIRED

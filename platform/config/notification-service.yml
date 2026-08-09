@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: notification-service
+
+payhub:
+  kafka:
+    enabled: true
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    payment-lifecycle-topic: payment.lifecycle.v1
+    payment-lifecycle-consumer-group: notification-payment-lifecycle-v1
+  notification:
+    webhooks:
+      default-url: ${PAYHUB_WEBHOOK_DEFAULT_URL:}
+      hmac-secret: ${PAYHUB_WEBHOOK_HMAC_SECRET:local-dev-webhook-hmac-secret-change-me}
+      max-attempts: ${PAYHUB_WEBHOOK_MAX_ATTEMPTS:5}
+      base-backoff: ${PAYHUB_WEBHOOK_BASE_BACKOFF:PT2S}
+      dispatch-batch-size: 20
+      dispatch-interval-ms: 2000
+      dispatch-enabled: true
+      notify-statuses:
+        - SETTLED
+        - FAILED_FINAL
+        - REFUND_SETTLED
+        - REFUND_FAILED_FINAL

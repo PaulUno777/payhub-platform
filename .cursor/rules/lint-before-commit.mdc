@@ -1,0 +1,27 @@
+---
+description: Fix IDE/linter diagnostics on touched files before declaring work done or committing
+alwaysApply: true
+---
+
+# Lint before commit
+
+Never leave known lint / IDE diagnostics on files you created or edited.
+
+## Before commit (and before saying a ticket is done)
+
+1. Run diagnostics on every path you changed (IDE Problems / `ReadLints` / the service’s formatter-linter if present).
+2. Fix **errors and warnings** you introduced or that appear on those files — resource leaks, null-safety, unused imports, dead/tautological code, unresolved types.
+3. Prefer a real fix over `@SuppressWarnings` unless the warning is a false positive from a third-party `@NonNull` boundary; if you suppress, comment *why* in one line.
+4. Re-check diagnostics after the fix; then run the relevant module tests; only then commit.
+
+## Scope
+
+- Touched files and their tests — do not boil the ocean on unrelated warnings in the monorepo.
+- Applies to feature tickets **and** chore/cleanup branches.
+- Does not replace ArchUnit, Surefire, or contract tests — those remain mandatory gates from `project-workflow.mdc` / `architecture.mdc`.
+
+## Anti-patterns
+
+- Committing with “I’ll clean lints later”
+- Rewriting clean method references to lambdas only to silence an analyzer
+- Suppressing resource-leak warnings instead of try-with-resources / `@AfterEach` shutdown

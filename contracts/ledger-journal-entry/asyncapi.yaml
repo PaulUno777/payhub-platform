@@ -1,0 +1,125 @@
+asyncapi: 2.6.0
+info:
+  title: PayHub ledger.journal-entry.v1
+  version: 0.1.0
+  description: |
+    FinLedger TransactionPosted events as published to Kafka after Debezium CDC
+    of `outbox_event` (DS-005). Payload field names mirror FinLedger
+    `com.pauluno.finledger.application.event.TransactionPosted` — do not invent fields.
+channels:
+  ledger.journal-entry.v1:
+    description: Journal entry posted (FinLedger outbox CDC)
+    publish:
+      operationId: publishJournalEntry
+      message:
+        $ref: '#/components/messages/JournalEntryEnvelope'
+    subscribe:
+      operationId: consumeJournalEntry
+      message:
+        $ref: '#/components/messages/JournalEntryEnvelope'
+components:
+  messages:
+    JournalEntryEnvelope:
+      name: JournalEntryEnvelope
+      contentType: application/json
+      headers:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+            description: FinLedger outbox_event.id (Debezium EventRouter)
+          tenantId:
+            type: string
+            format: uuid
+      payload:
+        $ref: '#/components/schemas/JournalEntryEnvelope'
+  schemas:
+    JournalEntryEnvelope:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - occurredAt
+        - producer
+        - aggregateId
+        - tenantId
+        - payload
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Dedup key for inbox (= outbox_event.id when from CDC)
+        eventType:
+          type: string
+          enum: [TransactionPosted]
+        schemaVersion:
+          type: string
+          example: "1"
+        occurredAt:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          example: finledger
+        aggregateId:
+          type: string
+          format: uuid
+          description: journalEntryId
+        tenantId:
+          type: string
+          format: uuid
+        traceparent:
+          type: string
+          nullable: true
+        causationId:
+          type: string
+          nullable: true
+        payload:
+          $ref: '#/components/schemas/TransactionPosted'
+    TransactionPosted:
+      type: object
+      description: FinLedger TransactionPosted (source of truth for field names)
+      required:
+        - tenantId
+        - journalEntryId
+        - transactionReference
+        - type
+        - postings
+        - occurredAt
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+        journalEntryId:
+          type: string
+          format: uuid
+        transactionReference:
+          type: string
+        type:
+          type: string
+        postings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostingSummary'
+        occurredAt:
+          type: string
+          format: date-time
+    PostingSummary:
+      type: object
+      required:
+        - accountId
+        - amount
+        - currencyCode
+        - settlementStatus
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        currencyCode:
+          type: string
+        settlementStatus:
+          type: string

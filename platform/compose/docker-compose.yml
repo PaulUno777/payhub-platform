@@ -1,0 +1,375 @@
+# PayHub local stack — ports: platform/ports.md
+name: payhub
+
+services:
+  config-server:
+    build:
+      context: ../..
+      dockerfile: services/config-server/Dockerfile
+    environment:
+      CONFIG_NATIVE_PATH: /config
+      SERVER_PORT: "8888"
+    volumes:
+      - ../config:/config:ro
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8888/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-finledger:
+    image: postgres:17-alpine
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_DB: finledger
+      POSTGRES_USER: finledger
+      POSTGRES_PASSWORD: finledger
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finledger -d finledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  finledger:
+    image: unoteck/finledger:0.1.0
+    depends_on:
+      postgres-finledger:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: sandbox
+      FINLEDGER_ENV: local
+      FINLEDGER_SECURITY_ISSUER: internal
+      FINLEDGER_SANDBOX_SCENARIO: aggregator
+      FINLEDGER_SANDBOX_DUMP_PATH: /workspace/config/sandbox-ready.txt
+      FINLEDGER_SANDBOX_BASE_URL: http://localhost:8080
+      DB_URL: jdbc:postgresql://postgres-finledger:5432/finledger
+      DB_USERNAME: finledger_app
+      DB_PASSWORD: finledger
+      SPRING_FLYWAY_USER: finledger
+      SPRING_FLYWAY_PASSWORD: finledger
+      SERVER_PORT: "8080"
+      MANAGEMENT_SERVER_PORT: "8081"
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - finledger-config:/workspace/config
+    # Hub image may lack curl; probe manually via host :8081 after start
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  kafka:
+    image: apache/kafka:3.8.1
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+    ports:
+      - "8085:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/subjects || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  debezium-connect:
+    image: debezium/connect:2.7.3.Final
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres-finledger:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: payhub-debezium
+      CONFIG_STORAGE_TOPIC: payhub_connect_configs
+      OFFSET_STORAGE_TOPIC: payhub_connect_offsets
+      STATUS_STORAGE_TOPIC: payhub_connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ../kafka/connectors:/kafka/connectors:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  postgres-merchant:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: merchant
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d merchant"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-orchestrator:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: orchestrator
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-risk:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: risk
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d risk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-rail:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: rail
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d rail"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-reconciliation:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: reconciliation
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d reconciliation"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-reporting:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: reporting
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5438:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d reporting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # DS-013 — Reporting cache-aside (not a PayHub service database)
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres-notification:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: payhub
+      POSTGRES_PASSWORD: payhub
+    ports:
+      - "5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payhub -d notification"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-temporal:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: temporal
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    ports:
+      - "5440:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres-temporal
+    ports:
+      - "7233:7233"
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+  # --- DS-011 identity (OIDC) — profile: identity — ADR-007 --------------------
+  # Cockroach is Zitadel-only. Never a PayHub service database.
+  cockroachdb:
+    profiles: ["identity"]
+    image: cockroachdb/cockroach:v24.3.18
+    command: start-single-node --insecure --advertise-addr=cockroachdb
+    ports:
+      - "26257:26257"
+      - "8086:8080"
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health?ready=1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  zitadel:
+    profiles: ["identity"]
+    image: ghcr.io/zitadel/zitadel:v2.71.12
+    command: start-from-init --masterkeyFromEnv --tlsMode disabled
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    environment:
+      ZITADEL_MASTERKEY: "${ZITADEL_MASTERKEY:-MasterkeyNeedsToHave32Chars!}"
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: "8090"
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_DATABASE_COCKROACH_HOST: cockroachdb
+      ZITADEL_DATABASE_COCKROACH_PORT: "26257"
+      ZITADEL_DATABASE_COCKROACH_DATABASE: zitadel
+      ZITADEL_DATABASE_COCKROACH_USER_USERNAME: root
+      ZITADEL_DATABASE_COCKROACH_USER_SSL_MODE: disable
+      ZITADEL_DATABASE_COCKROACH_ADMIN_USERNAME: root
+      ZITADEL_DATABASE_COCKROACH_ADMIN_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: PayHub
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: "PayHubAdmin1!"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD", "zitadel", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  # --- DS-012 observability — profile: observability ------------------------
+  # Jaeger all-in-one (OTLP gRPC/HTTP + UI). Not a PayHub service database.
+  jaeger:
+    profiles: ["observability"]
+    image: jaegertracing/all-in-one:1.67.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "16686:16686" # Jaeger UI
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # --- DS-014 RabbitMQ lab — profile: rabbitmq -------------------------------
+  # Optional comparison lab only. Not the v1 event backbone — see RABBITMQ_LAB.md.
+  rabbitmq:
+    profiles: ["rabbitmq"]
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: payhub
+      RABBITMQ_DEFAULT_PASS: payhub
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  finledger-config:
+  cockroach-data:

@@ -1,6 +1,6 @@
 # DS-ADR-001 — CAP / PACELC choices for PayHub components
 
-- **Status:** Draft (DS-001)
+- **Status:** Accepted (DS-001)
 - **Date:** 2026-08-08
 - **Deciders:** PayHub maintainers
 

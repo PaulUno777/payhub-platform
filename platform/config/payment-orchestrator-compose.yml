@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres-orchestrator:5432/orchestrator
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+payhub:
+  finledger:
+    base-url: ${FINLEDGER_BASE_URL:http://finledger:8080}
+  clients:
+    risk-service: http://risk-service:8080
+    rail-adapter-service: http://rail-adapter-service:8080
+    merchant-service: http://merchant-service:8080
+  temporal:
+    enabled: true
+    target: temporal:7233
+  risk:
+    mode: http
+  kafka:
+    enabled: true
+    bootstrap-servers: kafka:9092
+  outbox:
+    relay:
+      enabled: true

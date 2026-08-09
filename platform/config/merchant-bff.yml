@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: merchant-bff
+
+payhub:
+  security:
+    issuer-uri: ${PAYHUB_OIDC_ISSUER:http://localhost:8090}

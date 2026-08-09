@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: risk-service
+  version: 0.0.2
+  description: Sandbox risk evaluate (DS-006) — always APPROVED until rules engine exists.
+paths:
+  /actuator/health:
+    get:
+      summary: Health probe
+      operationId: health
+      responses:
+        '200':
+          description: OK
+  /api/v1/risk/evaluate:
+    post:
+      summary: Evaluate payment risk (sandbox always APPROVED)
+      operationId: evaluateRisk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateRiskRequest'
+      responses:
+        '200':
+          description: Decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluateRiskResponse'
+components:
+  schemas:
+    EvaluateRiskRequest:
+      type: object
+      required: [paymentId, merchantId, tenantId, amount, currencyCode]
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        currencyCode:
+          type: string
+    EvaluateRiskResponse:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVED, REJECTED, REVIEW]

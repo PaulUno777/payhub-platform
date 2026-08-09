@@ -1,0 +1,28 @@
+{
+  "name": "PayHub",
+  "image": "mcr.microsoft.com/devcontainers/java:1-21-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [8090, 8200, 8220, 8888, 26257],
+  "portsAttributes": {
+    "8090": { "label": "Zitadel OIDC" },
+    "8200": { "label": "Gateway" },
+    "8220": { "label": "Ops BFF" },
+    "8888": { "label": "Config Server" },
+    "26257": { "label": "CockroachDB SQL" }
+  },
+  "postCreateCommand": "docker compose -f platform/compose/docker-compose.yml --profile identity up -d cockroachdb zitadel",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

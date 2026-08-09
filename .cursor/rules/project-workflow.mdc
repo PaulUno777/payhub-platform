@@ -112,6 +112,8 @@ a ticket done.
 - One commit = one atomic concern (e.g., don't mix a saga-compensation fix with an
   unrelated adapter refactor)
 - Never leave existing tests red on purpose
+- Never commit with unresolved IDE/linter diagnostics on files you touched — see
+  `.cursor/rules/lint-before-commit.mdc` (fix before commit; no “clean up later”)
 - Never commit directly on `main` or `develop` for ticket work — use the feature branch
 
 ## Security

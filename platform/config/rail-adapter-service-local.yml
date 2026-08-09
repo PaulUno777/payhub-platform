@@ -1,0 +1,15 @@
+server:
+  port: 8330
+management:
+  server:
+    port: 8331
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5436/rail
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

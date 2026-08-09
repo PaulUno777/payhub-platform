@@ -1,0 +1,15 @@
+server:
+  port: 8420
+management:
+  server:
+    port: 8421
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5439/notification
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

@@ -10,7 +10,7 @@ sans mettre à jour ce fichier.
   PENDING créé par `POST .../rails/payments` **après acceptation PSP** représente
   "en attente de règlement" (voir `PLAN_PAYHUB.md` §1.4, §4.1, §9.1, §19).
 - ~~Q2 — Ownership FinLedger rails/*~~ → **Résolu : Orchestrator only.** Rail Adapter =
-  PSP uniquement. Merchant garde une ACL séparée pour le provisioning de compte.
+  PSP uniquement. Merchant garde une ACL séparée pour provisioning tenant+wallets (Q14).
 - ~~Q2b — Trou PENDING si initiate-avant-PSP~~ → **Résolu par réordonnancement.** PSP
   d'abord ; `initiate` seulement après acceptation traitement ; rejet net = zéro
   compensation ledger ; PENDING orphelin nettoyé via Break `request reversal`.
@@ -20,10 +20,12 @@ sans mettre à jour ce fichier.
 - ~~Q4 — Merchant onboarding hors scope~~ → **Inversé.** `merchant-service` est désormais
   un bounded context à part entière dès DS-004 (portail admin Angular prévu — hors roadmap
   DS-0xx v1, voir Q12).
-- ~~Q5 — `tenant.events.v1` utile via Q4~~ → **Toujours retiré du catalogue v1.** La
-  création de tenant reste `platform:admin` côté FinLedger ; `merchant-service` gère le
-  cycle de vie du *sous-marchand* PayHub, pas du tenant FinLedger — ce sont deux choses
-  différentes. Pas de topic nécessaire pour l'instant.
+- ~~Q5 — `tenant.events.v1` utile via Q4~~ → **Toujours retiré du catalogue v1.** Pas de
+  topic control-plane. La création du tenant FinLedger `SUB_MERCHANT` est un effet de
+  l'activation marchand (Q14), pas un événement Kafka PayHub.
+- ~~Q14 — Merchant = tenant FinLedger `SUB_MERCHANT` ou compte seul~~ → **Résolu (DS-001).**
+  `Merchant` actif → tenant FinLedger `SUB_MERCHANT` + wallets via
+  `AccountProvisioningPort` (voir `PLAN_PAYHUB.md` §9.3, §19, `context-map.md`).
 
 ## Toujours ouvertes
 
@@ -50,6 +52,12 @@ avant une opération conditionnelle.
 v1 = `NO_REVERSE` (comportement PSP standard, aucun code PayHub à changer si ça évolue —
 bascule de configuration tenant côté FinLedger uniquement).
 
+**Partiel (DS-009) :** Orchestrator provisionne `NO_REVERSE` via
+`PUT .../fee-config` (`payhub.finledger.provision-fee-config=true`) ;
+`LedgerPort.refund` passe `refundAmount` tel quel à `POST .../refunds`
+(champs : `transactionReference`, `originalJournalEntryId`, `refundAmount`,
+`currencyCode`) — zéro arithmétique de fee côté PayHub.
+
 **À lever :** seulement si le produit décide explicitement de vouloir reverser les frais
 sur remboursement — décision commerciale, pas technique.
 
@@ -60,15 +68,29 @@ sur remboursement — décision commerciale, pas technique.
 `…/split-rules/{ruleSetKey}`, `…/fee-config`. Aucun endpoint `cancel` rail — cohérent
 avec l'ordre PSP→initiate (§4.1).
 
-**Reste ouvert :** schéma JSON champ par champ (DTOs Java / OpenAPI complet) avant
-d'écrire `LedgerClient` en DS-003 — ne pas inventer les noms de champs.
+**Partiel (DS-004) — tenant + accounts :** champs pris des DTOs FinLedger sources (pas
+inventés) :
+- `POST /api/v1/tenants` → `CreateTenantRequest` (`name`, `type`, `parentTenantId`, `id`)
+  in `finledger/.../presentation/rest/tenant/TenantController.java` ; result
+  `CreateTenantResult` (`tenantId`, `name`, `type`, `parentTenantId`)
+- `POST /api/v1/tenants/{tenantId}/accounts` → `CreateAccountRequest` (`ownerRef`,
+  `currencyCode`, `type`, `allowsOverdraft`) in
+  `finledger/.../presentation/rest/account/LedgerAccountController.java` ; result
+  `CreateLedgerAccountResult` (`accountId`, …)
+
+**Partiel (DS-008) — settle :** `POST …/rails/payments/{railReference}/settle`
+avec `Idempotency-Key` + Bearer JWT (corps vide côté PayHub ACL). Initiate reste
+inchangé (`railCode`, amount, currency, clearing/counterparty account ids,
+clientReference).
+
+**Reste ouvert :** schéma JSON champ par champ pour `…/splits` avant DS-009
+ApplySplit.
 
 ### Q10 — Où vit la table de lookup de `SelectSplitRuleKey` ?
 
-Probablement `Merchant.assignedRuleSetKey` dans `merchant-service`, mais pas encore modélisé
-en migration/schéma.
-
-**À lever :** DS-004.
+**Résolu (DS-004).** `Merchant.assignedRuleSetKey` est persisté sur l'agrégat Merchant
+(`merchant-service`, table `merchant`). Orchestrator `MerchantPort` consommation =
+DS-006+.
 
 ### Q11 — Multi-devise en v1 ?
 
@@ -78,11 +100,12 @@ en migration/schéma.
 
 ### Q12 — Portail admin Angular : ticket dédié ou hors roadmap DS-0xx ?
 
-§19 motive `merchant-service` par un portail Angular futur, mais aucun DS-0xx ne le
-construit. Ops BFF REST suffit pour DS-004/009/010.
+**Décision v1 :** hors roadmap DS-0xx / post-capstone. Ops BFF REST suffit pour
+DS-004/009/010. Ne pas démarrer d'UI Angular pendant les tickets plateforme.
 
-**À lever :** explicitement "hors v1 / post-capstone", ou ajouter un ticket UI plus tard.
-Ne pas laisser l'Angular devenir du scope creep silencieux pendant DS-004.
+**Partiel (DS-010) :** Ops BFF expose `GET/POST /ops/reconciliation/...` (proxy thin vers
+`reconciliation-service`) — start run, list/get breaks, resolve `CONFIRM` /
+`REQUEST_REVERSAL`. Pas d'UI Angular.
 
 ### Q13 — `initiate` échoue après acceptation PSP → retry forever ?
 
@@ -95,21 +118,27 @@ l'argent PSP.
 **À lever :** seulement si DS-003 révèle un code d'erreur FinLedger qui impose un autre
 chemin.
 
-### Q14 — Merchant PayHub = tenant FinLedger `SUB_MERCHANT` ou seulement un compte ?
+### Q16 — Schema Registry format (Avro vs JSON Schema) pour `ledger.journal-entry.v1` ?
 
-Le sandbox FinLedger `aggregator` crée un **tenant** sous-marchand (`Send Tunnel`,
-`…000a2`) avec wallets, pas seulement un compte sous le tenant EcoPay. Le plan PayHub
-parle aujourd'hui d'`AccountProvisioningPort` (compte).
-
-**À lever :** DS-001 / DS-004 — décision recommandée : aligner sur FinLedger
-(`Merchant` actif → tenant `SUB_MERCHANT` + comptes), faute de quoi le modèle sandbox et
-les JWT `tenant_id` divergeront.
+**Résolu (DS-005 / ADR-004).** JSON Schema via Confluent Schema Registry in Compose;
+consumers deserialize JSON without Avro codegen. Revisit only if a later ticket proves
+Avro/compatibility tooling is required.
 
 ### Q15 — Nommage : « Send Tunnel »
 
 Dans FinLedger, **Send Tunnel** = label du sous-marchand sandbox. Dans PayHub, le PSP
 stub s'appelle désormais **MmSandbox** pour éviter la collision. Ne pas réintroduire
 « Send Tunnel » comme nom de PSP.
+
+### Q17 — Mapping Zitadel org → PayHub `tenant_id` claim ?
+
+**Décision v1 (DS-011 / ADR-007) :** les access tokens PayHub portent un claim
+custom `tenant_id` (UUID string). Configuré côté Zitadel (metadata / action) pour les
+users Ops/Merchant de démo. Les services comparent ce claim à
+`X-PayHub-Tenant-Id` (ou au `tenantId` du body quand présent).
+
+**À lever :** si un vrai multi-org Zitadel doit dériver automatiquement le UUID FinLedger
+`SUB_MERCHANT` sans claim custom — hors exit DS-011.
 
 ## Comment utiliser ce registre
 

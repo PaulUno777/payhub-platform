@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.0</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>com.payhub</groupId>
+	<artifactId>payhub-platform</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>pom</packaging>
+	<name>PayHub Platform</name>
+	<description>Learning-grade distributed payments platform (EcoPay Network) around FinLedger</description>
+	<url>https://github.com/PaulUno777/payhub-platform</url>
+
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<modules>
+		<module>build-conventions</module>
+		<module>libraries</module>
+		<module>services/config-server</module>
+		<module>services/gateway</module>
+		<module>services/merchant-bff</module>
+		<module>services/ops-bff</module>
+		<module>services/merchant-service</module>
+		<module>services/payment-orchestrator</module>
+		<module>services/risk-service</module>
+		<module>services/rail-adapter-service</module>
+		<module>services/reconciliation-service</module>
+		<module>services/reporting-service</module>
+		<module>services/notification-service</module>
+	</modules>
+
+	<properties>
+		<java.version>21</java.version>
+		<archunit.version>1.4.2</archunit.version>
+		<spring-cloud.version>2025.1.2</spring-cloud.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>com.payhub</groupId>
+				<artifactId>payhub-messaging</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+</project>

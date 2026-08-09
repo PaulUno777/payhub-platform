@@ -1,0 +1,28 @@
+spring:
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+payhub:
+  security:
+    issuer-uri: http://localhost:8090
+  clients:
+    merchant-service: http://localhost:8300
+    payment-orchestrator: http://localhost:8310
+    reconciliation-service: http://localhost:8400
+    reporting-service: http://localhost:8410
+    notification-service: http://localhost:8420

@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: payment-orchestrator
+
+payhub:
+  security:
+    issuer-uri: ${PAYHUB_OIDC_ISSUER:http://localhost:8090}
+  finledger:
+    base-url: ${FINLEDGER_BASE_URL:http://localhost:8080}
+  clients:
+    risk-service: ${PAYHUB_CLIENTS_RISK_SERVICE:http://localhost:8320}
+    rail-adapter-service: ${PAYHUB_CLIENTS_RAIL_ADAPTER_SERVICE:http://localhost:8330}
+    merchant-service: ${PAYHUB_CLIENTS_MERCHANT_SERVICE:http://localhost:8300}
+  temporal:
+    enabled: false
+    target: ${TEMPORAL_TARGET:localhost:7233}
+    namespace: default
+    task-queue: payment-capture
+  risk:
+    mode: in-memory
+  kafka:
+    enabled: true
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    payment-lifecycle-topic: payment.lifecycle.v1
+  outbox:
+    relay:
+      enabled: true
+      batch-size: 50
+      poll-interval-ms: 1000
+
+  resilience:
+    rail:
+      max-conn-total: 4
+      max-conn-per-route: 2
+      bulkhead-max-concurrent: 2
+      bulkhead-max-wait: PT0S
+      timeout: PT3S
+      connect-timeout: PT2S
+      slow-call-duration: PT2S
+      failure-rate-threshold: 50
+      retry-enabled: false
+    finledger:
+      max-conn-total: 16
+      max-conn-per-route: 8
+      bulkhead-max-concurrent: 8
+      bulkhead-max-wait: PT0S
+      timeout: PT5S
+      connect-timeout: PT2S
+      slow-call-duration: PT2S
+      failure-rate-threshold: 50
+      retry-enabled: true
+      retry-max-attempts: 2
+    risk:
+      max-conn-total: 8
+      max-conn-per-route: 4
+      bulkhead-max-concurrent: 4
+      bulkhead-max-wait: PT0S
+      timeout: PT1S
+      connect-timeout: PT1S
+      slow-call-duration: PT800MS
+      failure-rate-threshold: 50
+      retry-enabled: true
+      retry-max-attempts: 2

@@ -1,0 +1,28 @@
+server:
+  port: 8310
+management:
+  server:
+    port: 8311
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/orchestrator
+    username: ${DB_USERNAME:payhub}
+    password: ${DB_PASSWORD:payhub}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+payhub:
+  temporal:
+    enabled: true
+    target: localhost:7233
+  risk:
+    mode: http
+  kafka:
+    enabled: true
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  outbox:
+    relay:
+      enabled: true

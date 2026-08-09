@@ -1,0 +1,15 @@
+# In-network: every service listens on 8080 / 8081; DNS is the registry
+server:
+  port: 8080
+management:
+  server:
+    port: 8081
+  otlp:
+    tracing:
+      # Compose DNS when profile `observability` is up; override for host IDE / K8s
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://jaeger:4318/v1/traces}
+  tracing:
+    export:
+      otlp:
+        # Opt-in so apps stay quiet when Jaeger is not running
+        enabled: ${TRACING_OTLP_ENABLED:false}

@@ -21,21 +21,21 @@ PRs are human-owned (agents do not open them unless asked).
 
 | Ticket | Phase | Branch slug | Status |
 |--------|-------|-------------|--------|
-| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | pending |
-| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | pending |
-| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | pending |
-| DS-004 | Merchant service: `Merchant` aggregate, FinLedger account provisioning on activation, Ops BFF approve/reject | `ds-004/merchant-service` | pending |
-| DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | pending |
-| DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | pending |
-| DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects | `ds-007/processing-guarantees` | pending |
-| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | pending |
-| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | pending |
-| DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | pending |
-| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | pending |
-| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | pending |
-| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | pending |
-| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | pending |
-| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | pending |
+| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | done |
+| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | done |
+| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | done |
+| DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject | `ds-004/merchant-service` | done |
+| DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | done |
+| DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | done |
+| DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects | `ds-007/processing-guarantees` | done |
+| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | done |
+| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | done |
+| DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | done |
+| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | done |
+| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | done |
+| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | done |
+| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | done |
+| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | done |
 | DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | pending |
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | pending |
 | DS-018 | Kubernetes/GitOps: Services/DNS, policies, HPA/KEDA, PDB, secrets, progressive delivery | `ds-018/k8s-gitops` | pending |
@@ -60,24 +60,29 @@ criterion from `PLAN_PAYHUB.md` §17 explicitly before considering it done.
 
 ---
 
-## Bootstrapping the base project (DS-002)
+## Bootstrapping the base project (DS-002 / DS-003)
 
-PayHub is **10 independently-releasable services** plus a shared build-conventions
-module. Generate each one from [start.spring.io](https://start.spring.io) individually,
-with only the starters that service actually needs **at DS-002** — Kafka, Temporal, Redis,
+PayHub is **10 independently-releasable services** plus `config-server` (Spring Cloud Config)
+and a shared `build-conventions` module. Port map: [`platform/ports.md`](../platform/ports.md).
+Config YAML (profiles `local` / `compose`): [`platform/config/`](../platform/config/).
+
+Generate each business service from [start.spring.io](https://start.spring.io) individually,
+with only the starters that service actually needs **at scaffold time** — Kafka, Temporal, Redis,
 and AMQP are added later, only in the ticket that actually introduces them (see the note
 after the commands). Don't add them up front; that was a mistake in an earlier draft of
 this guide and it contradicts the project's own progressive-complexity principle
 (plan §0.2.8).
 
+Config Server must be reachable for `compose` profile (or use `optional:configserver:` +
+classpath test YAML). Boot order locally: `config-server` → Postgres → apps / FinLedger.
 ### 0. Conventions used for every service
 
 - `groupId`: `com.payhub`
 - `packageName`: `com.payhub.<service>`
 - `javaVersion`: `21`
 - `packaging`: `jar`
-- `bootVersion`: leave unspecified so Initializr picks current stable Spring Boot 3.x, then
-  pin it explicitly in every generated `pom.xml` so all services stay in lockstep
+- `bootVersion`: **`4.1.0`** (pass `-d bootVersion=4.1.0.RELEASE` to Initializr; reactor
+  parent pins `spring-boot-starter-parent` **4.1.0** so all services stay in lockstep)
 
 ### 1. Generate each service via the Initializr HTTP API — DS-002 minimal starters only
 
@@ -148,8 +153,8 @@ curl https://start.spring.io/starter.zip \
   -d dependencies=web,data-jpa,postgresql,flyway,validation,actuator,testcontainers \
   -o rail-adapter-service.zip
 unzip -q rail-adapter-service.zip -d services/rail-adapter-service && rm rail-adapter-service.zip
-# Kafka added at DS-005. Resilience4j (no official starter) added at DS-015:
-#   io.github.resilience4j:resilience4j-spring-boot3
+# Kafka added at DS-005. Resilience4j added at DS-015 on payment-orchestrator:
+#   io.github.resilience4j:resilience4j-spring-boot4 (+ httpclient5 pools)
 
 # --- reconciliation-service -------------------------------------------------
 curl https://start.spring.io/starter.zip \
@@ -179,18 +184,18 @@ curl https://start.spring.io/starter.zip \
   -d dependencies=web,data-jpa,postgresql,flyway,validation,actuator,testcontainers \
   -o notification-service.zip
 unzip -q notification-service.zip -d services/notification-service && rm notification-service.zip
-# AMQP (RabbitMQ) added at DS-014
+# Kafka + payhub-messaging added at DS-014 (HMAC webhooks). RabbitMQ = Compose lab only.
 ```
 
 Dependency timing, made explicit so nothing gets added early "just in case":
 
 | Dependency | Services | Added at |
 |---|---|---|
-| `kafka` (Spring Kafka) | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service | DS-005 (event backbone) |
+| `kafka` (Spring Kafka) | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service, notification-service | DS-005 (event backbone); notification at DS-014 |
 | Temporal SDK | payment-orchestrator | DS-006 (payment happy path) |
 | `data-redis` | reporting-service | DS-013 (CQRS) |
-| `amqp` (Spring AMQP) | notification-service | DS-014 (notifications) |
-| Resilience4j | rail-adapter-service (+ others as needed) | DS-015 (resilience) |
+| RabbitMQ (Compose profile `rabbitmq`) | lab only — not a service dependency | DS-014 (comparison lab; exit path = HTTP retries + Postgres `DEAD`) |
+| Resilience4j | payment-orchestrator (primary); rail-adapter as needed | DS-015 (resilience) |
 
 - `flyway` everywhere a service owns a Postgres schema — migrations are expand/contract
   from day one (plan §15.2).
@@ -205,8 +210,10 @@ Dependency timing, made explicit so nothing gets added early "just in case":
 2. Rename the generated main class to `<Service>Application`.
 3. Restructure into `domain/`, `application/`, `infrastructure/`, `adapter/` immediately —
    before writing any real class.
-4. Add the service's `Dockerfile` (multi-stage, non-root) and register it in
-   `platform/compose/docker-compose.yml`.
+4. Add the service's `Dockerfile` (multi-stage, non-root). Build **from repo root**:
+   `docker build -f services/<name>/Dockerfile -t pauluno/payhub-<name>:local .`
+   (reactor needs `libraries/` + sibling module POMs). Register the image in
+   `platform/compose/docker-compose.yml` when the ticket adds a compose service.
 5. Add an OpenAPI stub under `contracts/<service>/`.
 
 ### 3. Wire the aggregator reactor

@@ -57,7 +57,7 @@ Un sous-marchand d'EcoPay (onboardé et actif) crée un paiement de 100 USD (dev
 
 | Bounded context | Agrégat principal | Responsabilité | Données détenues |
 | --- | --- | --- | --- |
-| Merchant | `Merchant` | onboarding, statut, tier, règle de split assignée | statut, tier, `assignedRuleSetKey`, référence compte FinLedger |
+| Merchant | `Merchant` | onboarding, statut, tier, règle de split assignée ; provisioning FinLedger `SUB_MERCHANT` | statut, tier, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets |
 | Payment Orchestrator | `Payment` | intention, état, saga paiement + saga refund, commandes métier | paiement, refund, idempotence, outbox |
 | Risk | `RiskAssessment` | règles, limites, review manuelle | décision, raisons, versions de règles |
 | Rail Adapter | `RailOperation` | conversation PSP réelle uniquement — jamais d'appel FinLedger | opération fournisseur, attempts, raw payload chiffré |
@@ -152,14 +152,14 @@ Les transitions sont validées par l'agrégat `Payment`. Les événements extern
                  │                                                                             │
         ┌────────▼────────┐     REST (Orchestrator LedgerPort ONLY)                  ┌──────────┴──────────┐
         │   FinLedger      │◀── rails/payments, /settle, /splits, /refunds ──────────│  (pas Notification)  │
-        │  (core, jamais    │     Merchant Service : AccountProvisioningPort (compte) │                      │
-        │  forké) — outbox  │──CDC──▶ ledger.journal-entry.v1 (Reporting, Reconcile) │  Notification        │
-        │  → Debezium       │                                                          │  ← payment.lifecycle │
+        │  (core, jamais    │     Merchant : AccountProvisioningPort                  │                      │
+        │  forké) — outbox  │     (SUB_MERCHANT tenant + wallets)                    │  Notification        │
+        │  → Debezium       │──CDC──▶ ledger.journal-entry.v1 (Reporting, Reconcile) │  ← payment.lifecycle │
         └──────────────────┘                                                          │    .v1 (Orchestrator)│
                                                                                         │  livre via RabbitMQ  │
                                                                                         └────────────────────────┘
 
-  Ownership FinLedger : Orchestrator = rails/settle/splits/refunds ; Merchant = provisioning compte ;
+  Ownership FinLedger : Orchestrator = rails/settle/splits/refunds ; Merchant = SUB_MERCHANT tenant + wallets ;
   Rail Adapter = PSP uniquement (zéro appel FinLedger). Notification ne lit jamais l'outbox FinLedger.
 
   Cross-cutting : Service discovery (Compose DNS → K8s CoreDNS) · Distributed lock (Postgres advisory / K8s Lease)
@@ -181,10 +181,11 @@ payhub-platform/
 │   └── threat-model.md
 ├── build-conventions/          # ArchUnit de base, Checkstyle/Spotless, fixtures de test partagées
 ├── services/
+│   ├── config-server/           # infra — Spring Cloud Config (pas un bounded context)
 │   ├── gateway/
 │   ├── merchant-bff/
 │   ├── ops-bff/
-│   ├── merchant-service/        # nouveau — onboarding, statut, tier, règle de split assignée
+│   ├── merchant-service/        # onboarding, statut, tier, règle de split assignée
 │   ├── payment-orchestrator/     # Payment + Refund workflows
 │   ├── risk-service/
 │   ├── rail-adapter-service/
@@ -193,6 +194,8 @@ payhub-platform/
 │   └── notification-service/
 ├── contracts/
 ├── platform/
+│   ├── ports.md                 # table ports host / noms logiques (registry DNS)
+│   ├── config/                  # YAML multi-profil servi par config-server
 │   ├── compose/
 │   ├── kafka/
 │   ├── k8s/
@@ -210,7 +213,7 @@ payhub-platform/
 | Orchestrator | `WorkflowPort` | Temporal (`PaymentCaptureWorkflow`, `RefundWorkflow`) |
 | Orchestrator | `RiskPort` | REST interne / adapter in-memory pour tests |
 | Orchestrator | `MerchantPort` | REST interne vers `merchant-service` (`merchantId → assignedRuleSetKey`) |
-| Merchant Service | `AccountProvisioningPort` | client REST FinLedger **séparé** — création compte sous-marchand à l'activation (2ᵉ ACL, autre responsabilité) |
+| Merchant Service | `AccountProvisioningPort` | client REST FinLedger **séparé** — à l'activation : créer tenant `SUB_MERCHANT` + wallets (2ᵉ ACL ; aligné sandbox aggregator) |
 | Rail Adapter | `RailProviderPort` | PSP sandbox MmSandbox uniquement — **zéro** dépendance FinLedger |
 | Reconciliation | `StatementSourcePort` | fichiers CSV sandbox, ensuite SFTP/API |
 | Notification | `WebhookTransportPort` | HTTP signé HMAC |
@@ -218,7 +221,7 @@ payhub-platform/
 
 ### 2.3 Pourquoi pas un « shared domain »
 
-Seuls les contrats techniques étroits (trace context, event envelope, test fixtures) peuvent être partagés. Chaque service qui parle à FinLedger a **sa propre** anti-corruption layer (`FinLedgerClient` de l'Orchestrator via `LedgerPort` ; client provisioning du Merchant via `AccountProvisioningPort`). Pas de module « shared ledger SDK » métier partagé entre services.
+Seuls les contrats techniques étroits (trace context, event envelope, test fixtures) peuvent être partagés. Chaque service qui parle à FinLedger a **sa propre** anti-corruption layer (`FinLedgerClient` de l'Orchestrator via `LedgerPort` ; client Merchant via `AccountProvisioningPort` pour tenant+wallets). Pas de module « shared ledger SDK » métier partagé entre services.
 
 ---
 
@@ -232,6 +235,7 @@ Chaque service possède une base PostgreSQL ou un schéma strictement isolé. Un
 
 - **CQRS léger :** Payment Orchestrator, Merchant Service et FinLedger ont des write models autoritaires; Reporting construit des projections à partir de Kafka et expose un `asOf`/consumer lag.
 - **Pas d'event sourcing global.** Event sourcing ciblé autorisé en POC sur la timeline `Break` ou l'historique workflow, sous ADR.
+- **DS-013 :** lectures Reporting renvoient toujours `asOf` + `stalenessMs` + `freshness: NON_AUTHORITATIVE` (jamais « à jour » par défaut). Redis cache-aside derrière `ProjectionCachePort`, invalidation à l'upsert projection.
 
 ### 3.3 CAP, PACELC, ACID et BASE
 
@@ -337,13 +341,34 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 **Suppressions vs v1** : `tenant.events.v1` (aucun "control plane" PayHub réel — la création de tenant reste une opération `platform:admin` sur FinLedger, consommée via API, pas via topic) et `ledger.account-impact.v1` (Reporting dérive l'impact compte directement des postings de `ledger.journal-entry.v1`, sans second topic dédié tant que le besoin n'est pas prouvé — §0.2.8).
 
-### 6.2/6.3 — inchangé vs v1 (opérations Kafka, RabbitMQ comme laboratoire webhook)
+### 6.2 Kafka delivery operations (v1)
+
+- Producer path: Orchestrator transactional outbox → relay → `payment.lifecycle.v1` (key `paymentId`).
+- Consumers (Reporting, Notification, later Reconciliation) use inbox-before-action on `eventId`.
+- Finite in-listener retries (DefaultErrorHandler); dedicated `*.retry.*` / platform DLQ tooling is DS-016.
+- Notification (DS-014) does **not** rely on Kafka retry topics for merchant webhooks: it persists `WebhookDelivery` rows and retries HTTP delivery in-process; exhausted attempts become status `DEAD` (observable via `GET /api/v1/webhooks/dlq` / Ops `GET /ops/notifications/dlq`).
+
+### 6.3 RabbitMQ lab (optional — not the v1 backbone)
+
+Kafka remains the sole production event backbone. RabbitMQ is available under Compose profile `rabbitmq` for a **comparison lab** (work-queue fan-out vs Kafka + Postgres DEAD path). See [`platform/compose/RABBITMQ_LAB.md`](../platform/compose/RABBITMQ_LAB.md). Adoption as a second backbone requires an ADR; none is opened in DS-014.
 
 ---
 
 ## 7. Résilience, protection et limites de charge
 
-*(inchangé vs v1)* — budget de latence recalculé : la réponse synchrone `POST /payments` ne couvre plus que Gateway + BFF + Orchestrator + Risk (≈350–500ms sur un SLO de 2s), FinLedger étant désormais entièrement hors du chemin critique synchrone (voir §4.1).
+Budget de latence (sync `POST /payments`) : Gateway + BFF + Orchestrator + Risk ≈350–500ms sur un SLO de 2s ; FinLedger et le rail HTTP restent **hors** du chemin critique synchrone d'acceptation (saga Temporal / activités — §4.1).
+
+**In-app avant mesh** (DS-015, décision §19) : Resilience4j sur `payment-orchestrator` par dépendance outbound (`rail`, `finledger`, `risk`) :
+
+| Dépendance | Pool HTTP dédié | Bulkhead (max concurrent) | TimeLimiter (défaut) | CircuitBreaker | Retry |
+| --- | --- | --- | --- | --- | --- |
+| `rail` | `maxConnTotal=4` | 2 | 3s | failure-rate 50% / slow-call 2s | **non** (évite double retry avec Temporal ; timeout → `AMBIGUOUS`) |
+| `finledger` | `maxConnTotal=16` | 8 | 5s | idem | connexion / 5xx classifiés `retryable` seulement (max 2) |
+| `risk` | `maxConnTotal=8` | 4 | 1s | idem | max 2 sur erreurs retryable |
+
+Shedding / backpressure edge : rate-limit Gateway (DS-011). Bulkhead plein / CB open → fail-fast `retryable` (ledger/risk) ou rail `AMBIGUOUS` — jamais `FAILED_FINAL` sur timeout rail. Pas d'Istio/Linkerd en v1.
+
+Exit DS-015 : un rail lent **n'épuise pas** le pool FinLedger (pools + bulkheads séparés, prouvé sous charge concurrente).
 
 ---
 
@@ -370,25 +395,32 @@ Séquence Orchestrator (ordre verrouillé — voir §4.1) :
 
 ### 9.3 Merchant — nouveau bounded context
 
-- Agrégat `Merchant` : `id`, `status` (`PENDING_REVIEW` / `ACTIVE` / `SUSPENDED`), `tier`, `assignedRuleSetKey`, `finLedgerAccountId`.
-- À l'activation (`ACTIVE`), `AccountProvisioningPort` crée le compte sous-marchand côté FinLedger (ACL FinLedger **distincte** de celle de l'Orchestrator).
+- Agrégat `Merchant` : `id`, `status` (`PENDING_REVIEW` / `ACTIVE` / `SUSPENDED`), `tier`, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets FinLedger.
+- À l'activation (`ACTIVE`), `AccountProvisioningPort` crée un tenant FinLedger **`SUB_MERCHANT`** (enfant de l'agrégateur EcoPay) **et** ses wallets — ACL FinLedger **distincte** de celle de l'Orchestrator (décision DS-001 / Q14 ; alignée sandbox `aggregator` / `…a2`).
 - Approbation/rejet exposés côté Ops BFF (`POST /ops/merchants/{id}/approve|reject`).
-- Consommé par le Payment Orchestrator (`MerchantPort`) pour résoudre `merchantId → assignedRuleSetKey` avant `SelectSplitRuleKey`.
+- Consommé par le Payment Orchestrator (`MerchantPort`) pour résoudre `merchantId → assignedRuleSetKey` (et `finLedgerTenantId` pour les appels ledger) avant `SelectSplitRuleKey`.
 
 ### 9.4 Reconciliation
 
-Un run importe un statement rail idempotent, corrèle références, produit un `Break`. Actions opérateur auditables : `confirm`, `retry query`, `request reversal` (nettoie un PENDING orphelin après `RECONCILIATION_REQUIRED` → `FAILED_FINAL`), jamais de SQL direct sur FinLedger. Un seul run actif par tenant/rail (advisory lock / Lease).
+PayHub Reconciliation importe un statement rail idempotent, corrèle références, produit un `Break`. Actions opérateur auditables : `confirm`, `retry query`, `request reversal` (nettoie un PENDING orphelin après `RECONCILIATION_REQUIRED` → `FAILED_FINAL`), jamais de SQL direct sur FinLedger. Un seul run actif par tenant/rail (advisory lock / Lease).
+
+**Distinct** de la reconciliation in-box FinLedger (ADR-009 : `rail_instruction` vs settlement report) — voir `docs/context-map.md`.
 
 ---
 
 ## 10. Edge, sécurité et multi-tenancy
 
-*(inchangé vs v1, endpoints Ops BFF étendus)*
+*(endpoints Ops BFF étendus ; IdP local = Zitadel — ADR-007)*
 
+- Issuer OIDC local : Zitadel (`http://localhost:8090` en profil `identity` / DevContainer) ;
+  datastore IdP = CockroachDB single-node (**uniquement** Zitadel, jamais une DB métier PayHub).
+- JWT PayHub : `RS256`/`ES256` ; claims minimaux `sub` + `tenant_id` (UUID) pour l'isolation.
+- Gateway rejette toute requête API sans JWT valide **avant** routage vers un service métier.
 - `POST /ops/merchants/{id}/approve` / `/reject`
 - `POST /ops/payments/{id}/refunds` → déclenche `RefundWorkflow` (v1 : initié par un opérateur ; ouverture éventuelle côté Merchant BFF en self-service référencée dans `OPEN_QUESTIONS.md`, même commande Orchestrator, autz différente — jamais de duplication de workflow)
+- `GET/POST /ops/reconciliation/...` → proxy thin vers `reconciliation-service`
 - Endpoints breaks/DLQ déjà prévus, inchangés
-
+- FinLedger conserve son propre issuer (`internal` sandbox) — distinct du JWT edge PayHub.
 ---
 
 ## 11–16. Service discovery/K8s, Observabilité, HA/DR, Tests, CI/CD, Documentation
@@ -397,6 +429,10 @@ Un run importe un statement rail idempotent, corrèle références, produit un `
 
 Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant des points non tranchés (ex. self-service refund côté Merchant BFF, usage futur de `SUSPENSE_HOLD` pour les payouts, PRO_RATA vs NO_REVERSE si le produit évolue).
 
+### 12 (stub) — Tracing DS-012
+
+PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot-micrometer-tracing-opentelemetry`) with W3C `traceparent` on HTTP and on Kafka `EventEnvelope.traceparent`. Local collector: Compose profile `observability` (Jaeger all-in-one OTLP) — see `platform/compose/OBSERVABILITY.md`. Temporal span linking is out of scope for DS-012.
+
 ---
 
 ## 17. Roadmap de développement (renuméroté)
@@ -404,7 +440,7 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 1. **DS-001 — Cadrage DDD :** event storming, context map (incl. Merchant), langage ubiquitaire, ownership, ADR CAP/PACELC. *Exit : context map + ADR relus et approuvés, aucun BC sans propriétaire.*
 2. **DS-002 — Fondation dépôt :** skeleton hexagonal des 10 services, ArchUnit, Compose, CI, conventions contrats. *Exit : `./mvnw test` vert sur les 10 modules, ArchUnit actif, Compose démarre.*
 3. **DS-003 — Intégration FinLedger :** image versionnée, `LedgerPort`/`FinLedgerClient` Orchestrator (smoke `rails/payments` sandbox ou endpoint de connectivité documenté — pas un contournement métier via `journal-entries`), propagation tenant/trace/idempotence. *Exit : un appel `LedgerPort` rejoué avec la même `Idempotency-Key` ne crée aucun second effet.*
-4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning compte FinLedger à l'activation, endpoints Ops BFF approve/reject. *Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un compte FinLedger référencé.*
+4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning tenant FinLedger `SUB_MERCHANT` + wallets à l'activation, endpoints Ops BFF approve/reject. *Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un `finLedgerTenantId` `SUB_MERCHANT` et des wallets référencés.*
 5. **DS-005 — Backbone events :** outbox FinLedger → Debezium → Kafka, Schema Registry, AsyncAPI, premier consumer inbox. *Exit : replay Kafka/CDC ne double aucun effet fonctionnel.*
 6. **DS-006 — Paiement happy path (sans rail réel) :** `Payment` aggregate, idempotence API, Temporal, réponse sync = `RISK_APPROVED` ; RailPort stub/in-memory. *Exit : `CREATED` → `RISK_APPROVED` + workflow démarré ; pas d'exigence `SETTLED` (c'est DS-008).*
 7. **DS-007 — Garanties de traitement :** inbox/outbox standardisées, retries, side effects idempotents. *Exit : rejouer un message dupliqué ne produit aucun second effet.*
@@ -439,7 +475,8 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 | Décision | Alternative écartée | Raison |
 | --- | --- | --- |
 | PayHub démarre en 10 microservices, pas en monolithe modulaire | Monolithe d'abord, extraction par preuve | Objectif d'apprentissage prioritaire : les frontières inter-services sont le sujet du projet, pas un risque à différer |
-| Merchant est un bounded context dédié (`merchant-service`) | Données seedées statiques, pas de service | Un portail admin Angular est prévu ; l'onboarding/approbation marchand est une action d'opérateur réelle, pas un détail de configuration |
+| Merchant est un bounded context dédié (`merchant-service`) | Données seedées statiques, pas de service | Onboarding/approbation marchand est une action d'opérateur réelle (Ops BFF) ; Angular hors v1 (Q12) |
+| Merchant actif → tenant FinLedger `SUB_MERCHANT` + wallets | Compte seul sous le tenant EcoPay | Aligné sandbox FinLedger `aggregator` ; JWT `tenant_id` / isolation cohérents (Q14) |
 | Conversation PSP = Rail Adapter only ; appels FinLedger rails/settle/splits/refunds = Orchestrator `LedgerPort` only | Rail Adapter appelle aussi FinLedger ; ou webhook PSP → HMAC FinLedger | Sépare anti-corruption PSP vs ledger ; HMAC FinLedger ≠ contrat mobile money ; `ManualRailAdapter` ne parle à aucun PSP |
 | Ordre paiement : PSP d'abord, puis `initiate` (PENDING), puis `settle` | `initiate` avant le PSP (PENDING orphelin si rejet net) | Un rejet immédiat n'a rien à compenser ; pas besoin d'inventer un `cancel` FinLedger (Q9) ; PENDING seulement après acceptation traitement |
 | Pas de hold séparé (`SUSPENSE_HOLD`) pour le paiement entrant v1 | Hold explicite en plus du PENDING rail | Le PENDING post-acceptation PSP suffit ; `SUSPENSE_HOLD` réservé à d'autres besoins (Q7) |
@@ -453,6 +490,7 @@ Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant 
 | Outbox + CDC + inbox | Dual write, consumer naïf | Perte/doublon contrôlés |
 | Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
 | Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
+| IdP local = Zitadel (Go) + CockroachDB (état IdP seulement) | Keycloak sur Postgres ; Cockroach comme DB métier PayHub | Diversité d'écosystème + OIDC DevContainer ; Postgres reste la DB de chaque service PayHub (ADR-007) |
 
 ---
 

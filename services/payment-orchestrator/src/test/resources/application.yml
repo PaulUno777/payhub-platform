@@ -1,0 +1,42 @@
+spring:
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+payhub:
+  security:
+    issuer-uri: http://localhost:8090
+  finledger:
+    base-url: http://127.0.0.1:9
+    bearer-token: test-token
+    provision-fee-config: false
+  clients:
+    risk-service: http://127.0.0.1:9
+    rail-adapter-service: http://127.0.0.1:9
+    merchant-service: http://127.0.0.1:9
+  temporal:
+    enabled: false
+  risk:
+    mode: in-memory
+  rail:
+    mode: in-memory
+    sandbox-mode: ACCEPT
+  kafka:
+    enabled: false
+  outbox:
+    relay:
+      enabled: false

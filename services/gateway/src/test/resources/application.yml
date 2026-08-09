@@ -1,0 +1,31 @@
+spring:
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      otlp:
+        enabled: false
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+payhub:
+  security:
+    issuer-uri: http://localhost:8090
+  gateway:
+    rate-limit:
+      requests-per-window: 1000
+      window: PT1M
+    routes:
+      ops-bff: http://127.0.0.1:9
+      merchant-service: http://127.0.0.1:9
+      payment-orchestrator: http://127.0.0.1:9
+      reporting-service: http://127.0.0.1:9

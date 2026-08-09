@@ -1,0 +1,1 @@
+-- DS-002 scaffold baseline (no domain tables yet)
