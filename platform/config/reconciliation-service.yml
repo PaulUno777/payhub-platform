@@ -1,3 +1,7 @@
 spring:
   application:
     name: reconciliation-service
+
+payhub:
+  clients:
+    payment-orchestrator: ${PAYHUB_CLIENTS_PAYMENT_ORCHESTRATOR:http://localhost:8200}

@@ -1,10 +1,10 @@
 spring:
   application:
     name: payment-orchestrator
-  autoconfigure:
-    exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
 
 payhub:
+  security:
+    issuer-uri: ${PAYHUB_OIDC_ISSUER:http://localhost:8090}
   finledger:
     base-url: ${FINLEDGER_BASE_URL:http://localhost:8080}
   clients:

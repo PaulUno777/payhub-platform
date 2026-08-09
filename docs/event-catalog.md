@@ -19,6 +19,12 @@ AsyncAPI:
 
 **Not in v1:** `tenant.events.v1`, `ledger.account-impact.v1` (plan §19).
 
+**DS-010 statement import (sandbox):** classpath CSV under
+`reconciliation-service/src/main/resources/statements/{statementKey}.csv` with header
+`externalRef,paymentId,statementStatus,amount,currencyCode`. Correlation is HTTP against
+Orchestrator payment status (not a Kafka consumer for exit). Breaks resolve via audited
+ops commands (`CONFIRM` / `REQUEST_REVERSAL`) — never FinLedger SQL.
+
 Envelope (minimum): `eventId`, `eventType`, `schemaVersion`, `occurredAt`, `producer`,
 `aggregateId`, `tenantId`, `traceparent`, `causationId`, minimal PII-free payload.
 

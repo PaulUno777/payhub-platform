@@ -103,6 +103,10 @@ DS-006+.
 **Décision v1 :** hors roadmap DS-0xx / post-capstone. Ops BFF REST suffit pour
 DS-004/009/010. Ne pas démarrer d'UI Angular pendant les tickets plateforme.
 
+**Partiel (DS-010) :** Ops BFF expose `GET/POST /ops/reconciliation/...` (proxy thin vers
+`reconciliation-service`) — start run, list/get breaks, resolve `CONFIRM` /
+`REQUEST_REVERSAL`. Pas d'UI Angular.
+
 ### Q13 — `initiate` échoue après acceptation PSP → retry forever ?
 
 **Décision par défaut (en vigueur dans §4.1) :** retry idempotent, jamais abandonné,
@@ -125,6 +129,16 @@ Avro/compatibility tooling is required.
 Dans FinLedger, **Send Tunnel** = label du sous-marchand sandbox. Dans PayHub, le PSP
 stub s'appelle désormais **MmSandbox** pour éviter la collision. Ne pas réintroduire
 « Send Tunnel » comme nom de PSP.
+
+### Q17 — Mapping Zitadel org → PayHub `tenant_id` claim ?
+
+**Décision v1 (DS-011 / ADR-007) :** les access tokens PayHub portent un claim
+custom `tenant_id` (UUID string). Configuré côté Zitadel (metadata / action) pour les
+users Ops/Merchant de démo. Les services comparent ce claim à
+`X-PayHub-Tenant-Id` (ou au `tenantId` du body quand présent).
+
+**À lever :** si un vrai multi-org Zitadel doit dériver automatiquement le UUID FinLedger
+`SUB_MERCHANT` sans claim custom — hors exit DS-011.
 
 ## Comment utiliser ce registre
 

@@ -6,14 +6,14 @@ spring:
       enabled: false
       import-check:
         enabled: false
-  autoconfigure:
-    exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
 management:
   endpoints:
     web:
       exposure:
         include: health,info
 payhub:
+  security:
+    issuer-uri: http://localhost:8090
   finledger:
     base-url: http://localhost:8080
     aggregator-tenant-id: 00000000-0000-0000-0000-0000000000a1

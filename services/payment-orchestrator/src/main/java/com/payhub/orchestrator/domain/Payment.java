@@ -143,6 +143,19 @@ public class Payment {
         touch();
     }
 
+    /** Operator-audited exit from ambiguous rail state (DS-010) — never FinLedger SQL. */
+    public void resolveReconciliationFailed() {
+        if (status == PaymentStatus.FAILED_FINAL) {
+            return;
+        }
+        if (status != PaymentStatus.RECONCILIATION_REQUIRED) {
+            throw new IllegalPaymentStateException(
+                    "Cannot resolve reconciliation as FAILED_FINAL from status " + status);
+        }
+        this.status = PaymentStatus.FAILED_FINAL;
+        touch();
+    }
+
     public void markReconciliationRequired() {
         if (status == PaymentStatus.RECONCILIATION_REQUIRED) {
             return;

@@ -6,8 +6,16 @@ spring:
       enabled: false
       import-check:
         enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+payhub:
+  clients:
+    payment-orchestrator: http://localhost:8200
