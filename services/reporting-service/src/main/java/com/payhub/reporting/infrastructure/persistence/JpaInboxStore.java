@@ -5,7 +5,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
-import com.payhub.reporting.application.port.out.InboxStore;
+import com.payhub.messaging.inbox.InboxStore;
 
 @Component
 public class JpaInboxStore implements InboxStore {

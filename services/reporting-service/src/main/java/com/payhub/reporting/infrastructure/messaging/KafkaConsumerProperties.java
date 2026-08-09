@@ -6,7 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record KafkaConsumerProperties(
         String bootstrapServers,
         String journalEntryTopic,
-        String consumerGroup
+        String consumerGroup,
+        String paymentLifecycleTopic,
+        String paymentLifecycleConsumerGroup
 ) {
 
     public KafkaConsumerProperties {
@@ -18,6 +20,12 @@ public record KafkaConsumerProperties(
         }
         if (consumerGroup == null || consumerGroup.isBlank()) {
             consumerGroup = "reporting-ledger-journal-v1";
+        }
+        if (paymentLifecycleTopic == null || paymentLifecycleTopic.isBlank()) {
+            paymentLifecycleTopic = "payment.lifecycle.v1";
+        }
+        if (paymentLifecycleConsumerGroup == null || paymentLifecycleConsumerGroup.isBlank()) {
+            paymentLifecycleConsumerGroup = "reporting-payment-lifecycle-v1";
         }
     }
 }

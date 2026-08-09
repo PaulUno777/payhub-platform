@@ -21,7 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.payhub.reporting.application.dto.JournalEntryEnvelope;
 import com.payhub.reporting.application.dto.JournalEntryEnvelope.PostingSummary;
 import com.payhub.reporting.application.dto.JournalEntryEnvelope.TransactionPostedPayload;
-import com.payhub.reporting.application.port.out.InboxStore;
+import com.payhub.messaging.inbox.InboxStore;
 import com.payhub.reporting.application.port.out.JournalEntryProjectionStore;
 import com.payhub.reporting.application.port.out.JournalEntryProjectionStore.JournalEntryProjection;
 
