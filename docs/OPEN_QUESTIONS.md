@@ -62,15 +62,24 @@ sur remboursement — décision commerciale, pas technique.
 `…/split-rules/{ruleSetKey}`, `…/fee-config`. Aucun endpoint `cancel` rail — cohérent
 avec l'ordre PSP→initiate (§4.1).
 
-**Reste ouvert :** schéma JSON champ par champ (DTOs Java / OpenAPI complet) avant
-d'écrire `LedgerClient` en DS-003 — ne pas inventer les noms de champs.
+**Partiel (DS-004) — tenant + accounts :** champs pris des DTOs FinLedger sources (pas
+inventés) :
+- `POST /api/v1/tenants` → `CreateTenantRequest` (`name`, `type`, `parentTenantId`, `id`)
+  in `finledger/.../presentation/rest/tenant/TenantController.java` ; result
+  `CreateTenantResult` (`tenantId`, `name`, `type`, `parentTenantId`)
+- `POST /api/v1/tenants/{tenantId}/accounts` → `CreateAccountRequest` (`ownerRef`,
+  `currencyCode`, `type`, `allowsOverdraft`) in
+  `finledger/.../presentation/rest/account/LedgerAccountController.java` ; result
+  `CreateLedgerAccountResult` (`accountId`, …)
+
+**Reste ouvert :** schéma JSON champ par champ pour `…/splits` / `…/rails/payments`
+avant d'étendre `LedgerPort` au-delà de `initiate` (DS-006+).
 
 ### Q10 — Où vit la table de lookup de `SelectSplitRuleKey` ?
 
-Probablement `Merchant.assignedRuleSetKey` dans `merchant-service`, mais pas encore modélisé
-en migration/schéma.
-
-**À lever :** DS-004.
+**Résolu (DS-004).** `Merchant.assignedRuleSetKey` est persisté sur l'agrégat Merchant
+(`merchant-service`, table `merchant`). Orchestrator `MerchantPort` consommation =
+DS-006+.
 
 ### Q11 — Multi-devise en v1 ?
 
