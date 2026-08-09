@@ -124,6 +124,22 @@ class PaymentTest {
     }
 
     @Test
+    void should_resolve_reconciliation_required_to_failed_final_via_audited_command() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markReconciliationRequired();
+        payment.resolveReconciliationFailed();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.FAILED_FINAL);
+    }
+
+    @Test
+    void should_forbid_resolve_reconciliation_from_settled() {
+        Payment payment = settled();
+        assertThatThrownBy(payment::resolveReconciliationFailed)
+                .isInstanceOf(IllegalPaymentStateException.class);
+    }
+
+    @Test
     void should_forbid_negative_money() {
         assertThatThrownBy(() -> Money.of("-1.00", "USD"))
                 .isInstanceOf(IllegalArgumentException.class);

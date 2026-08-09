@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.payhub.orchestrator.application.dto.PaymentView;
 import com.payhub.orchestrator.application.dto.RequestRefundCommand;
+import com.payhub.orchestrator.application.dto.ResolveReconciliationCommand;
 import com.payhub.orchestrator.application.dto.SubmitPaymentCommand;
 import com.payhub.orchestrator.application.port.in.GetPaymentUseCase;
 import com.payhub.orchestrator.application.port.in.RequestRefundUseCase;
+import com.payhub.orchestrator.application.port.in.ResolveReconciliationUseCase;
 import com.payhub.orchestrator.application.port.in.SubmitPaymentUseCase;
 
 import jakarta.validation.Valid;
@@ -30,15 +32,18 @@ public class PaymentController {
     private final SubmitPaymentUseCase submitPaymentUseCase;
     private final GetPaymentUseCase getPaymentUseCase;
     private final RequestRefundUseCase requestRefundUseCase;
+    private final ResolveReconciliationUseCase resolveReconciliationUseCase;
 
     public PaymentController(
             SubmitPaymentUseCase submitPaymentUseCase,
             GetPaymentUseCase getPaymentUseCase,
-            RequestRefundUseCase requestRefundUseCase
+            RequestRefundUseCase requestRefundUseCase,
+            ResolveReconciliationUseCase resolveReconciliationUseCase
     ) {
         this.submitPaymentUseCase = submitPaymentUseCase;
         this.getPaymentUseCase = getPaymentUseCase;
         this.requestRefundUseCase = requestRefundUseCase;
+        this.resolveReconciliationUseCase = resolveReconciliationUseCase;
     }
 
     @PostMapping
@@ -77,6 +82,20 @@ public class PaymentController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(PaymentResponse.from(view));
     }
 
+    @PostMapping("/{id}/resolve-reconciliation")
+    public PaymentResponse resolveReconciliation(
+            @PathVariable UUID id,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody ResolveReconciliationRequest request
+    ) {
+        PaymentView view = resolveReconciliationUseCase.execute(new ResolveReconciliationCommand(
+                id,
+                request.action(),
+                idempotencyKey
+        ));
+        return PaymentResponse.from(view);
+    }
+
     public record SubmitRequest(
             @NotNull UUID merchantId,
             @NotNull UUID tenantId,
@@ -89,6 +108,11 @@ public class PaymentController {
     public record RefundRequest(
             @NotBlank String amount,
             String sandboxMode
+    ) {
+    }
+
+    public record ResolveReconciliationRequest(
+            @NotBlank String action
     ) {
     }
 

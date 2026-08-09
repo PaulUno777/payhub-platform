@@ -7,3 +7,5 @@ spring:
 payhub:
   clients:
     merchant-service: ${PAYHUB_CLIENTS_MERCHANT_SERVICE:http://localhost:8300}
+    payment-orchestrator: ${PAYHUB_CLIENTS_PAYMENT_ORCHESTRATOR:http://localhost:8200}
+    reconciliation-service: ${PAYHUB_CLIENTS_RECONCILIATION_SERVICE:http://localhost:8400}

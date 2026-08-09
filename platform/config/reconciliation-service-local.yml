@@ -13,3 +13,7 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+payhub:
+  clients:
+    payment-orchestrator: ${PAYHUB_CLIENTS_PAYMENT_ORCHESTRATOR:http://localhost:8200}
