@@ -29,8 +29,27 @@ public class HttpRailPort implements RailPort {
 
     @Override
     public RailSubmitResult submit(RailSubmitCommand command) {
+        return postSubmit("/api/v1/rail-operations", command);
+    }
+
+    @Override
+    public RailProofResult awaitFinalProof(RailProofCommand command) {
+        return postProof("/api/v1/rail-operations/{paymentId}/proof", command);
+    }
+
+    @Override
+    public RailSubmitResult submitRefund(RailSubmitCommand command) {
+        return postSubmit("/api/v1/rail-operations/refunds", command);
+    }
+
+    @Override
+    public RailProofResult awaitRefundProof(RailProofCommand command) {
+        return postProof("/api/v1/rail-operations/refunds/{paymentId}/proof", command);
+    }
+
+    private RailSubmitResult postSubmit(String path, RailSubmitCommand command) {
         OperationResponse body = restClient.post()
-                .uri("/api/v1/rail-operations")
+                .uri(path)
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(SANDBOX_MODE_HEADER, modeOrDefault(command.sandboxMode()))
                 .body(new SubmitRequest(command.paymentId(), command.amount(), command.currencyCode()))
@@ -42,10 +61,9 @@ public class HttpRailPort implements RailPort {
         return new RailSubmitResult(RailResult.valueOf(body.outcome()), body.providerReference());
     }
 
-    @Override
-    public RailProofResult awaitFinalProof(RailProofCommand command) {
+    private RailProofResult postProof(String path, RailProofCommand command) {
         OperationResponse body = restClient.post()
-                .uri("/api/v1/rail-operations/{paymentId}/proof", command.paymentId())
+                .uri(path, command.paymentId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .header(SANDBOX_MODE_HEADER, modeOrDefault(command.sandboxMode()))
                 .body(new ProofRequest(command.providerReference()))
