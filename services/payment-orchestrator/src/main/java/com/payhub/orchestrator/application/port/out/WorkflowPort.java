@@ -8,6 +8,8 @@ public interface WorkflowPort {
 
     void signalContinueCapture(UUID paymentId);
 
+    void startRefund(RefundStart command);
+
     record PaymentCaptureStart(
             UUID paymentId,
             UUID merchantId,
@@ -15,6 +17,13 @@ public interface WorkflowPort {
             String amount,
             String currencyCode,
             String clientReference,
+            String sandboxMode
+    ) {
+    }
+
+    record RefundStart(
+            UUID paymentId,
+            String refundAmount,
             String sandboxMode
     ) {
     }

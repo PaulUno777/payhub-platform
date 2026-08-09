@@ -3,6 +3,7 @@ package com.payhub.orchestrator.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Tag;
@@ -65,18 +66,17 @@ class PaymentTest {
 
     @Test
     void should_reach_settled_on_happy_path() {
-        Payment payment = riskApproved();
-        payment.markRailSubmitted();
-        payment.markSettlementPending();
-        payment.markSettled();
+        Payment payment = settled();
         assertThat(payment.status()).isEqualTo(PaymentStatus.SETTLED);
+        assertThat(payment.railReference()).isEqualTo("rail-1");
+        assertThat(payment.initiateJournalEntryId()).isNotNull();
     }
 
     @Test
     void should_reach_reconciliation_required_after_pending() {
         Payment payment = riskApproved();
         payment.markRailSubmitted();
-        payment.markSettlementPending();
+        payment.markSettlementPending("rail-1", UUID.randomUUID());
         payment.markReconciliationRequired();
         assertThat(payment.status()).isEqualTo(PaymentStatus.RECONCILIATION_REQUIRED);
     }
@@ -92,8 +92,35 @@ class PaymentTest {
     void should_forbid_failed_final_from_settlement_pending() {
         Payment payment = riskApproved();
         payment.markRailSubmitted();
-        payment.markSettlementPending();
+        payment.markSettlementPending("rail-1", UUID.randomUUID());
         assertThatThrownBy(payment::markFailedFinal).isInstanceOf(IllegalPaymentStateException.class);
+    }
+
+    @Test
+    void should_partial_refund_happy_path() {
+        Payment payment = settled();
+        payment.requestRefund(new BigDecimal("4.00"));
+        payment.markRefundRailSubmitted();
+        payment.markRefundSettlementPending();
+        payment.markRefundSettled(new BigDecimal("4.00"));
+        assertThat(payment.status()).isEqualTo(PaymentStatus.REFUND_SETTLED);
+        assertThat(payment.refundedAmount()).isEqualByComparingTo("4.00");
+    }
+
+    @Test
+    void should_reject_refund_exceeding_remaining() {
+        Payment payment = settled();
+        assertThatThrownBy(() -> payment.requestRefund(new BigDecimal("11.00")))
+                .isInstanceOf(IllegalPaymentStateException.class);
+    }
+
+    @Test
+    void should_fail_refund_without_ledger_on_rail_reject() {
+        Payment payment = settled();
+        payment.requestRefund(new BigDecimal("2.00"));
+        payment.markRefundRailSubmitted();
+        payment.markRefundFailedFinal();
+        assertThat(payment.status()).isEqualTo(PaymentStatus.REFUND_FAILED_FINAL);
     }
 
     @Test
@@ -110,6 +137,14 @@ class PaymentTest {
         Payment payment = sample();
         payment.markRiskPending();
         payment.approveRisk();
+        return payment;
+    }
+
+    private static Payment settled() {
+        Payment payment = riskApproved();
+        payment.markRailSubmitted();
+        payment.markSettlementPending("rail-1", UUID.randomUUID());
+        payment.markSettled();
         return payment;
     }
 }

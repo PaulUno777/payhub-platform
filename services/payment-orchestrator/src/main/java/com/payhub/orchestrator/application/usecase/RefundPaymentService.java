@@ -1,5 +1,6 @@
 package com.payhub.orchestrator.application.usecase;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -8,12 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.payhub.orchestrator.application.IllegalPaymentTransitionException;
 import com.payhub.orchestrator.application.PaymentNotFoundException;
-import com.payhub.orchestrator.application.port.in.CapturePaymentUseCase;
+import com.payhub.orchestrator.application.port.in.RefundPaymentUseCase;
 import com.payhub.orchestrator.application.port.out.LedgerCredentialsPort;
 import com.payhub.orchestrator.application.port.out.LedgerPort;
-import com.payhub.orchestrator.application.port.out.LedgerPort.ConfirmSettlementCommand;
-import com.payhub.orchestrator.application.port.out.LedgerPort.InitiateRailPaymentCommand;
-import com.payhub.orchestrator.application.port.out.MerchantPort;
+import com.payhub.orchestrator.application.port.out.LedgerPort.RefundCommand;
 import com.payhub.orchestrator.application.port.out.PaymentLifecyclePublisher;
 import com.payhub.orchestrator.application.port.out.PaymentRepository;
 import com.payhub.orchestrator.application.port.out.RailPort;
@@ -22,28 +21,24 @@ import com.payhub.orchestrator.application.port.out.RailPort.RailResult;
 import com.payhub.orchestrator.application.port.out.RailPort.RailSubmitCommand;
 import com.payhub.orchestrator.domain.IllegalPaymentStateException;
 import com.payhub.orchestrator.domain.Payment;
-import com.payhub.orchestrator.domain.PaymentStatus;
 
 @Service
-public class CapturePaymentService implements CapturePaymentUseCase {
+public class RefundPaymentService implements RefundPaymentUseCase {
 
     private final PaymentRepository paymentRepository;
-    private final MerchantPort merchantPort;
     private final RailPort railPort;
     private final LedgerPort ledgerPort;
     private final LedgerCredentialsPort ledgerCredentialsPort;
     private final PaymentLifecyclePublisher paymentLifecyclePublisher;
 
-    public CapturePaymentService(
+    public RefundPaymentService(
             PaymentRepository paymentRepository,
-            MerchantPort merchantPort,
             RailPort railPort,
             LedgerPort ledgerPort,
             LedgerCredentialsPort ledgerCredentialsPort,
             PaymentLifecyclePublisher paymentLifecyclePublisher
     ) {
         this.paymentRepository = paymentRepository;
-        this.merchantPort = merchantPort;
         this.railPort = railPort;
         this.ledgerPort = ledgerPort;
         this.ledgerCredentialsPort = ledgerCredentialsPort;
@@ -51,28 +46,35 @@ public class CapturePaymentService implements CapturePaymentUseCase {
     }
 
     @Override
-    public String selectSplitRuleKey(UUID merchantId) {
-        return merchantPort.findById(merchantId).assignedRuleSetKey();
+    @Transactional
+    public void markRequested(UUID paymentId, String refundAmount) {
+        Payment payment = require(paymentId);
+        try {
+            payment.requestRefund(new BigDecimal(refundAmount));
+        } catch (IllegalPaymentStateException | IllegalArgumentException ex) {
+            throw new IllegalPaymentTransitionException(ex.getMessage());
+        }
+        persist(payment);
     }
 
     @Override
     @Transactional
-    public SubmitPspResult submitToPsp(UUID paymentId, String sandboxMode) {
+    public SubmitRefundRailResult submitToPsp(UUID paymentId, String refundAmount, String sandboxMode) {
         Payment payment = require(paymentId);
         try {
-            payment.markRailSubmitted();
+            payment.markRefundRailSubmitted();
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
         persist(payment);
 
-        var result = railPort.submit(new RailSubmitCommand(
+        var result = railPort.submitRefund(new RailSubmitCommand(
                 payment.id(),
-                payment.money().amount().toPlainString(),
+                refundAmount,
                 payment.money().currency().getCurrencyCode(),
                 sandboxMode
         ));
-        return new SubmitPspResult(result.outcome(), result.providerReference());
+        return new SubmitRefundRailResult(result.outcome(), result.providerReference());
     }
 
     @Override
@@ -80,7 +82,7 @@ public class CapturePaymentService implements CapturePaymentUseCase {
     public void failAfterPspReject(UUID paymentId) {
         Payment payment = require(paymentId);
         try {
-            payment.markFailedFinal();
+            payment.markRefundFailedFinal();
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
@@ -92,7 +94,7 @@ public class CapturePaymentService implements CapturePaymentUseCase {
     public void requireReconciliation(UUID paymentId) {
         Payment payment = require(paymentId);
         try {
-            payment.markReconciliationRequired();
+            payment.markRefundReconciliationRequired();
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
@@ -101,58 +103,42 @@ public class CapturePaymentService implements CapturePaymentUseCase {
 
     @Override
     @Transactional
-    public InitiateResult initiateAfterPspAccept(UUID paymentId) {
+    public void markSettlementPendingAfterRailAccept(UUID paymentId) {
         Payment payment = require(paymentId);
-        if (payment.status() != PaymentStatus.RAIL_SUBMITTED) {
-            throw new IllegalPaymentTransitionException(
-                    "Cannot initiate ledger from status " + payment.status());
-        }
-
-        var initiated = ledgerPort.initiateRailPayment(new InitiateRailPaymentCommand(
-                payment.tenantId(),
-                "rail-init-" + payment.id(),
-                ledgerCredentialsPort.railCode(),
-                payment.money().amount().toPlainString(),
-                payment.money().currency().getCurrencyCode(),
-                ledgerCredentialsPort.clearingAccountId(),
-                ledgerCredentialsPort.counterpartyAccountId(),
-                payment.clientReference(),
-                Objects.requireNonNull(ledgerCredentialsPort.bearerToken(), "bearerToken")
-        ));
-
         try {
-            payment.markSettlementPending(initiated.railReference(), initiated.initiateJournalEntryId());
+            payment.markRefundSettlementPending();
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
         persist(payment);
-        return new InitiateResult(initiated.railReference());
     }
 
     @Override
     public RailResult awaitFinalProof(UUID paymentId, String providerReference, String sandboxMode) {
-        return railPort.awaitFinalProof(new RailProofCommand(paymentId, providerReference, sandboxMode))
+        return railPort.awaitRefundProof(new RailProofCommand(paymentId, providerReference, sandboxMode))
                 .outcome();
     }
 
     @Override
     @Transactional
-    public void settleAfterProof(UUID paymentId, String railReference) {
+    public void confirmLedgerRefund(UUID paymentId, String refundAmount) {
         Payment payment = require(paymentId);
-        if (payment.status() != PaymentStatus.SETTLEMENT_PENDING) {
-            throw new IllegalPaymentTransitionException(
-                    "Cannot settle from status " + payment.status());
+        if (payment.initiateJournalEntryId() == null || payment.railReference() == null) {
+            throw new IllegalPaymentTransitionException("Payment missing ledger refs for refund");
         }
 
-        ledgerPort.confirmSettlement(new ConfirmSettlementCommand(
+        ledgerPort.refund(new RefundCommand(
                 payment.tenantId(),
-                railReference,
-                "rail-settle-" + payment.id(),
+                "refund-" + payment.id() + "-" + refundAmount,
+                payment.railReference(),
+                payment.initiateJournalEntryId(),
+                refundAmount,
+                payment.money().currency().getCurrencyCode(),
                 Objects.requireNonNull(ledgerCredentialsPort.bearerToken(), "bearerToken")
         ));
 
         try {
-            payment.markSettled();
+            payment.markRefundSettled(new BigDecimal(refundAmount));
         } catch (IllegalPaymentStateException ex) {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }

@@ -23,4 +23,9 @@ public class NoOpWorkflowPort implements WorkflowPort {
     public void signalContinueCapture(UUID paymentId) {
         // no-op
     }
+
+    @Override
+    public void startRefund(RefundStart command) {
+        // no-op
+    }
 }

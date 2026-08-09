@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.payhub.railadapter.application.port.in.AwaitRailProofUseCase;
+import com.payhub.railadapter.application.port.in.AwaitRailRefundProofUseCase;
 import com.payhub.railadapter.application.port.in.SubmitRailOperationUseCase;
+import com.payhub.railadapter.application.port.in.SubmitRailRefundUseCase;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -26,13 +28,19 @@ public class RailOperationController {
 
     private final SubmitRailOperationUseCase submitRailOperationUseCase;
     private final AwaitRailProofUseCase awaitRailProofUseCase;
+    private final SubmitRailRefundUseCase submitRailRefundUseCase;
+    private final AwaitRailRefundProofUseCase awaitRailRefundProofUseCase;
 
     public RailOperationController(
             SubmitRailOperationUseCase submitRailOperationUseCase,
-            AwaitRailProofUseCase awaitRailProofUseCase
+            AwaitRailProofUseCase awaitRailProofUseCase,
+            SubmitRailRefundUseCase submitRailRefundUseCase,
+            AwaitRailRefundProofUseCase awaitRailRefundProofUseCase
     ) {
         this.submitRailOperationUseCase = submitRailOperationUseCase;
         this.awaitRailProofUseCase = awaitRailProofUseCase;
+        this.submitRailRefundUseCase = submitRailRefundUseCase;
+        this.awaitRailRefundProofUseCase = awaitRailRefundProofUseCase;
     }
 
     @PostMapping
@@ -58,6 +66,36 @@ public class RailOperationController {
             @Valid @RequestBody ProofRequest request
     ) {
         var result = awaitRailProofUseCase.execute(new AwaitRailProofUseCase.Command(
+                paymentId,
+                request.providerReference(),
+                sandboxMode
+        ));
+        return new OperationResponse(result.outcome(), request.providerReference());
+    }
+
+    @PostMapping("/refunds")
+    @ResponseStatus(HttpStatus.OK)
+    public OperationResponse submitRefund(
+            @RequestHeader(value = SANDBOX_MODE_HEADER, required = false) String sandboxMode,
+            @Valid @RequestBody SubmitRequest request
+    ) {
+        var result = submitRailRefundUseCase.execute(new SubmitRailRefundUseCase.Command(
+                request.paymentId(),
+                request.amount(),
+                request.currencyCode(),
+                sandboxMode
+        ));
+        return new OperationResponse(result.outcome(), result.providerReference());
+    }
+
+    @PostMapping("/refunds/{paymentId}/proof")
+    @ResponseStatus(HttpStatus.OK)
+    public OperationResponse refundProof(
+            @PathVariable UUID paymentId,
+            @RequestHeader(value = SANDBOX_MODE_HEADER, required = false) String sandboxMode,
+            @Valid @RequestBody ProofRequest request
+    ) {
+        var result = awaitRailRefundProofUseCase.execute(new AwaitRailRefundProofUseCase.Command(
                 paymentId,
                 request.providerReference(),
                 sandboxMode

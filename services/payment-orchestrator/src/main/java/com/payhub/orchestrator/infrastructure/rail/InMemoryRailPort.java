@@ -23,6 +23,25 @@ public class InMemoryRailPort implements RailPort {
 
     @Override
     public RailSubmitResult submit(RailSubmitCommand command) {
+        return resolveSubmit(command, "mm-");
+    }
+
+    @Override
+    public RailProofResult awaitFinalProof(RailProofCommand command) {
+        return resolveProof(command);
+    }
+
+    @Override
+    public RailSubmitResult submitRefund(RailSubmitCommand command) {
+        return resolveSubmit(command, "mm-refund-");
+    }
+
+    @Override
+    public RailProofResult awaitRefundProof(RailProofCommand command) {
+        return resolveProof(command);
+    }
+
+    private RailSubmitResult resolveSubmit(RailSubmitCommand command, String prefix) {
         String mode = command.sandboxMode() == null || command.sandboxMode().isBlank()
                 ? defaultMode
                 : command.sandboxMode();
@@ -31,14 +50,13 @@ public class InMemoryRailPort implements RailPort {
             case "AMBIGUOUS" -> new RailSubmitResult(RailResult.AMBIGUOUS, null);
             case "ACCEPT", "PROOF_AMBIGUOUS" -> new RailSubmitResult(
                     RailResult.ACCEPTED,
-                    "mm-" + command.paymentId()
+                    prefix + command.paymentId()
             );
             default -> throw new IllegalArgumentException("Unknown sandbox mode: " + mode);
         };
     }
 
-    @Override
-    public RailProofResult awaitFinalProof(RailProofCommand command) {
+    private RailProofResult resolveProof(RailProofCommand command) {
         String mode = command.sandboxMode() == null || command.sandboxMode().isBlank()
                 ? defaultMode
                 : command.sandboxMode();

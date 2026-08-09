@@ -16,3 +16,4 @@ management:
 payhub:
   clients:
     merchant-service: http://localhost:8300
+    payment-orchestrator: http://localhost:8200

@@ -3,13 +3,17 @@ package com.payhub.orchestrator.application.port.out;
 import java.util.UUID;
 
 /**
- * Rail submission port — MmSandbox via rail-adapter (DS-008).
+ * Rail submission port — MmSandbox via rail-adapter.
  */
 public interface RailPort {
 
     RailSubmitResult submit(RailSubmitCommand command);
 
     RailProofResult awaitFinalProof(RailProofCommand command);
+
+    RailSubmitResult submitRefund(RailSubmitCommand command);
+
+    RailProofResult awaitRefundProof(RailProofCommand command);
 
     enum RailResult {
         ACCEPTED,

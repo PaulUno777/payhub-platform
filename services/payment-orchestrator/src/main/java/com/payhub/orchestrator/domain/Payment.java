@@ -1,5 +1,6 @@
 package com.payhub.orchestrator.domain;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -12,6 +13,9 @@ public class Payment {
     private final Money money;
     private final String clientReference;
     private PaymentStatus status;
+    private String railReference;
+    private UUID initiateJournalEntryId;
+    private BigDecimal refundedAmount;
     private final Instant createdAt;
     private Instant updatedAt;
 
@@ -22,6 +26,9 @@ public class Payment {
             Money money,
             String clientReference,
             PaymentStatus status,
+            String railReference,
+            UUID initiateJournalEntryId,
+            BigDecimal refundedAmount,
             Instant createdAt,
             Instant updatedAt
     ) {
@@ -31,6 +38,9 @@ public class Payment {
         this.money = Objects.requireNonNull(money);
         this.clientReference = Objects.requireNonNull(clientReference);
         this.status = Objects.requireNonNull(status);
+        this.railReference = railReference;
+        this.initiateJournalEntryId = initiateJournalEntryId;
+        this.refundedAmount = refundedAmount == null ? BigDecimal.ZERO : refundedAmount;
         this.createdAt = Objects.requireNonNull(createdAt);
         this.updatedAt = Objects.requireNonNull(updatedAt);
     }
@@ -44,6 +54,9 @@ public class Payment {
                 money,
                 clientReference,
                 PaymentStatus.CREATED,
+                null,
+                null,
+                BigDecimal.ZERO,
                 now,
                 now
         );
@@ -56,10 +69,25 @@ public class Payment {
             Money money,
             String clientReference,
             PaymentStatus status,
+            String railReference,
+            UUID initiateJournalEntryId,
+            BigDecimal refundedAmount,
             Instant createdAt,
             Instant updatedAt
     ) {
-        return new Payment(id, merchantId, tenantId, money, clientReference, status, createdAt, updatedAt);
+        return new Payment(
+                id,
+                merchantId,
+                tenantId,
+                money,
+                clientReference,
+                status,
+                railReference,
+                initiateJournalEntryId,
+                refundedAmount,
+                createdAt,
+                updatedAt
+        );
     }
 
     public void markRiskPending() {
@@ -127,8 +155,10 @@ public class Payment {
         touch();
     }
 
-    public void markSettlementPending() {
+    public void markSettlementPending(String railReference, UUID initiateJournalEntryId) {
         requireStatus(PaymentStatus.RAIL_SUBMITTED, "markSettlementPending");
+        this.railReference = Objects.requireNonNull(railReference, "railReference");
+        this.initiateJournalEntryId = Objects.requireNonNull(initiateJournalEntryId, "initiateJournalEntryId");
         this.status = PaymentStatus.SETTLEMENT_PENDING;
         touch();
     }
@@ -139,6 +169,67 @@ public class Payment {
         }
         requireStatus(PaymentStatus.SETTLEMENT_PENDING, "markSettled");
         this.status = PaymentStatus.SETTLED;
+        touch();
+    }
+
+    public void requestRefund(BigDecimal refundAmount) {
+        Objects.requireNonNull(refundAmount, "refundAmount");
+        if (refundAmount.signum() <= 0) {
+            throw new IllegalArgumentException("refundAmount must be positive");
+        }
+        if (status != PaymentStatus.SETTLED && status != PaymentStatus.REFUND_SETTLED) {
+            throw new IllegalPaymentStateException("Cannot request refund from status " + status);
+        }
+        BigDecimal remaining = money.amount().subtract(refundedAmount);
+        if (refundAmount.compareTo(remaining) > 0) {
+            throw new IllegalPaymentStateException(
+                    "Refund amount " + refundAmount + " exceeds remaining " + remaining);
+        }
+        this.status = PaymentStatus.REFUND_REQUESTED;
+        touch();
+    }
+
+    public void markRefundRailSubmitted() {
+        requireStatus(PaymentStatus.REFUND_REQUESTED, "markRefundRailSubmitted");
+        this.status = PaymentStatus.REFUND_RAIL_SUBMITTED;
+        touch();
+    }
+
+    public void markRefundFailedFinal() {
+        if (status == PaymentStatus.REFUND_FAILED_FINAL) {
+            return;
+        }
+        if (status != PaymentStatus.REFUND_RAIL_SUBMITTED) {
+            throw new IllegalPaymentStateException("Cannot mark REFUND_FAILED_FINAL from status " + status);
+        }
+        this.status = PaymentStatus.REFUND_FAILED_FINAL;
+        touch();
+    }
+
+    public void markRefundReconciliationRequired() {
+        if (status == PaymentStatus.REFUND_RECONCILIATION_REQUIRED) {
+            return;
+        }
+        if (status != PaymentStatus.REFUND_RAIL_SUBMITTED
+                && status != PaymentStatus.REFUND_SETTLEMENT_PENDING) {
+            throw new IllegalPaymentStateException(
+                    "Cannot mark REFUND_RECONCILIATION_REQUIRED from status " + status);
+        }
+        this.status = PaymentStatus.REFUND_RECONCILIATION_REQUIRED;
+        touch();
+    }
+
+    public void markRefundSettlementPending() {
+        requireStatus(PaymentStatus.REFUND_RAIL_SUBMITTED, "markRefundSettlementPending");
+        this.status = PaymentStatus.REFUND_SETTLEMENT_PENDING;
+        touch();
+    }
+
+    public void markRefundSettled(BigDecimal refundAmount) {
+        Objects.requireNonNull(refundAmount, "refundAmount");
+        requireStatus(PaymentStatus.REFUND_SETTLEMENT_PENDING, "markRefundSettled");
+        this.refundedAmount = this.refundedAmount.add(refundAmount);
+        this.status = PaymentStatus.REFUND_SETTLED;
         touch();
     }
 
@@ -158,6 +249,9 @@ public class Payment {
     public Money money() { return money; }
     public String clientReference() { return clientReference; }
     public PaymentStatus status() { return status; }
+    public String railReference() { return railReference; }
+    public UUID initiateJournalEntryId() { return initiateJournalEntryId; }
+    public BigDecimal refundedAmount() { return refundedAmount; }
     public Instant createdAt() { return createdAt; }
     public Instant updatedAt() { return updatedAt; }
 }

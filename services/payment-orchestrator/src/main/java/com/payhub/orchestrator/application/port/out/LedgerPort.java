@@ -11,6 +11,10 @@ public interface LedgerPort {
 
     ConfirmSettlementResult confirmSettlement(ConfirmSettlementCommand command);
 
+    RefundResult refund(RefundCommand command);
+
+    void putFeeConfig(PutFeeConfigCommand command);
+
     record InitiateRailPaymentCommand(
             UUID tenantId,
             String idempotencyKey,
@@ -45,6 +49,31 @@ public interface LedgerPort {
             String railReference,
             String status,
             boolean replayed
+    ) {
+    }
+
+    record RefundCommand(
+            UUID tenantId,
+            String idempotencyKey,
+            String transactionReference,
+            UUID originalJournalEntryId,
+            String refundAmount,
+            String currencyCode,
+            String bearerToken
+    ) {
+    }
+
+    record RefundResult(
+            UUID refundId,
+            String status,
+            boolean replayed
+    ) {
+    }
+
+    record PutFeeConfigCommand(
+            UUID tenantId,
+            String feeReversalPolicy,
+            String bearerToken
     ) {
     }
 }

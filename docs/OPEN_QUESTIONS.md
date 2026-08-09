@@ -52,6 +52,12 @@ avant une opération conditionnelle.
 v1 = `NO_REVERSE` (comportement PSP standard, aucun code PayHub à changer si ça évolue —
 bascule de configuration tenant côté FinLedger uniquement).
 
+**Partiel (DS-009) :** Orchestrator provisionne `NO_REVERSE` via
+`PUT .../fee-config` (`payhub.finledger.provision-fee-config=true`) ;
+`LedgerPort.refund` passe `refundAmount` tel quel à `POST .../refunds`
+(champs : `transactionReference`, `originalJournalEntryId`, `refundAmount`,
+`currencyCode`) — zéro arithmétique de fee côté PayHub.
+
 **À lever :** seulement si le produit décide explicitement de vouloir reverser les frais
 sur remboursement — décision commerciale, pas technique.
 
