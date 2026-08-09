@@ -8,7 +8,8 @@ public record KafkaConsumerProperties(
         String journalEntryTopic,
         String consumerGroup,
         String paymentLifecycleTopic,
-        String paymentLifecycleConsumerGroup
+        String paymentLifecycleConsumerGroup,
+        Integer concurrency
 ) {
 
     public KafkaConsumerProperties {
@@ -26,6 +27,9 @@ public record KafkaConsumerProperties(
         }
         if (paymentLifecycleConsumerGroup == null || paymentLifecycleConsumerGroup.isBlank()) {
             paymentLifecycleConsumerGroup = "reporting-payment-lifecycle-v1";
+        }
+        if (concurrency == null || concurrency < 1) {
+            concurrency = 2;
         }
     }
 }

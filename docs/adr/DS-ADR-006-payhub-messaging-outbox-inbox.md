@@ -21,8 +21,11 @@ DS-005 proved inbox dedup for FinLedger CDC → Reporting. PayHub services still
    every PayHub database.
 3. **Never dual-write:** aggregate mutation + outbox insert in one local Postgres TX;
    Kafka publish is after commit via the relay.
-4. **Retries:** consumer-side finite Spring Kafka retries for now; dedicated
-   `*.retry.*` / DLQ tooling is DS-016.
+4. **Retries / poison (DS-016):** consumer-side finite Spring Kafka retries, then
+   `{topic}.dlq` via `KafkaPoisonHandlers` / `DeadLetterPublishingRecoverer`. Dedicated
+   delayed `*.retry.*` topic chains remain deferred. Replay is an ops use case on Reporting
+   (`POST /api/v1/reporting/events/dlq/replay`); see
+   [`docs/runbooks/kafka-poison-messages.md`](../runbooks/kafka-poison-messages.md).
 
 ## Consequences
 
@@ -31,3 +34,5 @@ DS-005 proved inbox dedup for FinLedger CDC → Reporting. PayHub services still
   inbox table / port semantics.
 - Rejected: shared domain JAR, dual-write from use case to Kafka, Debezium on every
   PayHub DB in DS-007.
+- Optional `spring-kafka` on `payhub-messaging` for `KafkaPoisonHandlers` only; services
+  that do not wire poison handlers do not need to use that type.

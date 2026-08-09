@@ -337,7 +337,7 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 | `payment.lifecycle.v1` | Orchestrator | `paymentId` | Reporting, Notification, Reconciliation | 30 jours |
 | `ledger.journal-entry.v1` | FinLedger CDC | `journalEntryId` | Reporting, Reconciliation | 90 jours |
 | `rail.operation.v1` | Rail Adapter | `railOperationId` | Orchestrator, Reconciliation | 30 jours |
-| `*.retry.*` / `*.dlq` | consumers | clé d'origine | outil de replay | politique dédiée |
+| `*.retry.*` / `{topic}.dlq` | consumers → DLQ; ops replay | clé d'origine | Reporting replay + runbook; `*.retry.*` deferred | politique dédiée |
 
 **Suppressions vs v1** : `tenant.events.v1` (aucun "control plane" PayHub réel — la création de tenant reste une opération `platform:admin` sur FinLedger, consommée via API, pas via topic) et `ledger.account-impact.v1` (Reporting dérive l'impact compte directement des postings de `ledger.journal-entry.v1`, sans second topic dédié tant que le besoin n'est pas prouvé — §0.2.8).
 
@@ -345,7 +345,12 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 - Producer path: Orchestrator transactional outbox → relay → `payment.lifecycle.v1` (key `paymentId`).
 - Consumers (Reporting, Notification, later Reconciliation) use inbox-before-action on `eventId`.
-- Finite in-listener retries (DefaultErrorHandler); dedicated `*.retry.*` / platform DLQ tooling is DS-016.
+- Finite in-listener retries (`DefaultErrorHandler` + `FixedBackOff`), then isolate to
+  `{originalTopic}.dlq` via `DeadLetterPublishingRecoverer` (DS-016). Shared helper:
+  `libraries/payhub-messaging` `KafkaPoisonHandlers`. Consumer concurrency defaults to 2 so a
+  poison partition does not stall others. Replay: `POST /api/v1/reporting/events/dlq/replay`
+  (runbook [`docs/runbooks/kafka-poison-messages.md`](runbooks/kafka-poison-messages.md)).
+- Dedicated delayed `{topic}.retry.*` chains are **deferred**; v1 keeps in-listener retry + `.dlq`.
 - Notification (DS-014) does **not** rely on Kafka retry topics for merchant webhooks: it persists `WebhookDelivery` rows and retries HTTP delivery in-process; exhausted attempts become status `DEAD` (observable via `GET /api/v1/webhooks/dlq` / Ops `GET /ops/notifications/dlq`).
 
 ### 6.3 RabbitMQ lab (optional — not the v1 backbone)
@@ -452,7 +457,7 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 13. **DS-013 — CQRS :** Reporting projection, staleness, Redis cache-aside. *Exit : une lecture Reporting expose son `asOf`/lag, jamais présentée comme à jour par défaut.*
 14. **DS-014 — Notifications :** webhooks signés, retries, DLQ; POC RabbitMQ documenté. *Exit : une livraison webhook échouée finit en DLQ observable, jamais perdue silencieusement.*
 15. **DS-015 — Résilience :** budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure. *Exit : un rail lent n'épuise pas le pool de connexions FinLedger (bulkhead prouvé sous charge).*
-16. **DS-016 — Event operations :** retry topics, replay tool, quotas, rebalances. *Exit : un message poison est isolé sans bloquer les autres partitions.*
+16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. *Exit : un message poison est isolé sans bloquer les autres partitions.*
 17. **DS-017 — Chaos/load :** injection de pannes, blast radius, capacity report. *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
 18. **DS-018 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
 19. **DS-019 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
