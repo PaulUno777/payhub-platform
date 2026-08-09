@@ -8,3 +8,5 @@ payhub:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     journal-entry-topic: ledger.journal-entry.v1
     consumer-group: reporting-ledger-journal-v1
+    payment-lifecycle-topic: payment.lifecycle.v1
+    payment-lifecycle-consumer-group: reporting-payment-lifecycle-v1

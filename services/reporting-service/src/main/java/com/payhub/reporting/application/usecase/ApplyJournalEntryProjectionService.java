@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.payhub.reporting.application.dto.JournalEntryEnvelope;
 import com.payhub.reporting.application.port.in.ApplyJournalEntryProjectionUseCase;
-import com.payhub.reporting.application.port.out.InboxStore;
+import com.payhub.messaging.inbox.InboxStore;
 import com.payhub.reporting.application.port.out.JournalEntryProjectionStore;
 import com.payhub.reporting.application.port.out.JournalEntryProjectionStore.JournalEntryProjection;
 

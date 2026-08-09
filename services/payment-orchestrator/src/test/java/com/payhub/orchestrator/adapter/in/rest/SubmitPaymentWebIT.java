@@ -66,7 +66,7 @@ class SubmitPaymentWebIT {
                 .andReturn();
 
         JsonNode payment = objectMapper.readTree(first.getResponse().getContentAsString());
-        String paymentId = payment.get("id").asText();
+        String paymentId = payment.get("id").asString();
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Idempotency-Key", "idem-web-1")

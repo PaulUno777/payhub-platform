@@ -16,6 +16,7 @@ import com.payhub.orchestrator.application.dto.PaymentView;
 import com.payhub.orchestrator.application.dto.SubmitPaymentCommand;
 import com.payhub.orchestrator.application.port.in.SubmitPaymentUseCase;
 import com.payhub.orchestrator.application.port.out.IdempotencyStore;
+import com.payhub.orchestrator.application.port.out.PaymentLifecyclePublisher;
 import com.payhub.orchestrator.application.port.out.PaymentRepository;
 import com.payhub.orchestrator.application.port.out.RiskPort;
 import com.payhub.orchestrator.application.port.out.RiskPort.RiskCommand;
@@ -35,17 +36,20 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
     private final IdempotencyStore idempotencyStore;
     private final WorkflowPort workflowPort;
     private final RiskPort riskPort;
+    private final PaymentLifecyclePublisher paymentLifecyclePublisher;
 
     public SubmitPaymentService(
             PaymentRepository paymentRepository,
             IdempotencyStore idempotencyStore,
             WorkflowPort workflowPort,
-            RiskPort riskPort
+            RiskPort riskPort,
+            PaymentLifecyclePublisher paymentLifecyclePublisher
     ) {
         this.paymentRepository = paymentRepository;
         this.idempotencyStore = idempotencyStore;
         this.workflowPort = workflowPort;
         this.riskPort = riskPort;
+        this.paymentLifecyclePublisher = paymentLifecyclePublisher;
     }
 
     @Override
@@ -97,7 +101,14 @@ public class SubmitPaymentService implements SubmitPaymentUseCase {
             throw new IllegalPaymentTransitionException(ex.getMessage());
         }
 
-        return PaymentView.from(paymentRepository.save(saved));
+        Payment persisted = paymentRepository.save(saved);
+        paymentLifecyclePublisher.publishStatusChanged(
+                persisted.id(),
+                persisted.merchantId(),
+                persisted.tenantId(),
+                persisted.status()
+        );
+        return PaymentView.from(persisted);
     }
 
     static String requestHash(SubmitPaymentCommand command) {

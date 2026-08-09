@@ -13,6 +13,8 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 @Configuration
 @EnableKafka
@@ -41,6 +43,8 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(journalEntryConsumerFactory);
         factory.getContainerProperties().setAckMode(
                 org.springframework.kafka.listener.ContainerProperties.AckMode.RECORD);
+        // Finite retries (DS-007); dedicated retry topics remain DS-016
+        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(500L, 3L)));
         return factory;
     }
 }

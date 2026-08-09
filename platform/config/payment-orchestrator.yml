@@ -18,3 +18,12 @@ payhub:
     task-queue: payment-capture
   risk:
     mode: in-memory
+  kafka:
+    enabled: true
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    payment-lifecycle-topic: payment.lifecycle.v1
+  outbox:
+    relay:
+      enabled: true
+      batch-size: 50
+      poll-interval-ms: 1000
