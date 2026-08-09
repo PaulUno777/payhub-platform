@@ -270,5 +270,10 @@ public class OutboundResilienceConfig {
                 }
             }).get();
         }
+
+        /** Visible for tests that wait until a bulkhead permit is held. */
+        public int availableBulkheadPermits(String dependency) {
+            return bulkheadRegistry.bulkhead(dependency).getMetrics().getAvailableConcurrentCalls();
+        }
     }
 }

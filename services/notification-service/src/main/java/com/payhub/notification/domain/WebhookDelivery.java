@@ -67,7 +67,8 @@ public final class WebhookDelivery {
             Instant now
     ) {
         Objects.requireNonNull(now, "now");
-        boolean missingEndpoint = endpointUrl == null || endpointUrl.isBlank();
+        String url = endpointUrl == null ? "" : endpointUrl.trim();
+        boolean missingEndpoint = url.isEmpty();
         return new WebhookDelivery(
                 UUID.randomUUID(),
                 eventId,
@@ -75,10 +76,10 @@ public final class WebhookDelivery {
                 tenantId,
                 paymentStatus,
                 occurredAt,
-                missingEndpoint ? "" : endpointUrl.trim(),
+                url,
                 missingEndpoint ? WebhookDeliveryStatus.DEAD : WebhookDeliveryStatus.PENDING,
                 0,
-                missingEndpoint ? now : now,
+                now,
                 missingEndpoint ? "webhook endpoint not configured" : null,
                 now,
                 now

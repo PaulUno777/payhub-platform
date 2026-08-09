@@ -26,6 +26,7 @@ class FinLedgerClientIdempotencyTest {
 
     private MockWebServer server;
     private LedgerPort ledgerPort;
+    private TestDependencyResilience resilienceFixture;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -43,11 +44,15 @@ class FinLedgerClientIdempotencyTest {
         RestClient restClient = RestClient.builder()
                 .baseUrl(properties.baseUrl())
                 .build();
-        ledgerPort = new FinLedgerClient(restClient, TestDependencyResilience.permissive());
+        resilienceFixture = TestDependencyResilience.permissive();
+        ledgerPort = new FinLedgerClient(restClient, resilienceFixture.resilience());
     }
 
     @AfterEach
     void tearDown() throws IOException {
+        if (resilienceFixture != null) {
+            resilienceFixture.close();
+        }
         server.shutdown();
     }
 
