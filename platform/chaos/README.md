@@ -31,6 +31,6 @@ See [capacity-report.md](capacity-report.md) (DS-015 bulkhead evidence + how to 
 
 ## Out of scope here
 
-- Chaos Mesh / pod kills → DS-018+
+- Chaos Mesh / pod kills → DS-019+
 - Full k6/Gatling product load suite
-- DR zone loss → DS-022
+- DR zone loss → DS-023

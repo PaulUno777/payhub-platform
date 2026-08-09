@@ -35,7 +35,7 @@ Ambiguous rail outcomes → `RECONCILIATION_REQUIRED` (never direct `FAILED_FINA
 
 - Positive: interview-defensible, testable timeout behaviour (DS-008 exit)
 - Trade-off: operators must close Breaks; happy-path latency includes async rail
-- Follow-up: SLOs in DS-020; chaos proving no duplicate money effect in DS-017
+- Follow-up: SLOs in DS-021; chaos proving no duplicate money effect in DS-017
 
 ## References
 

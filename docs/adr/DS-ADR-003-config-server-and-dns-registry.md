@@ -24,5 +24,5 @@ fight Compose/Kubernetes discovery.
 
 - Config Server must start before (or be optional for) clients; tests use
   `optional:configserver:` plus classpath test YAML.
-- Future DS-018 can swap native → git URI / ConfigMaps without changing client import shape.
+- Future DS-019 can swap native → git URI / ConfigMaps without changing client import shape.
 - Rejects a second discovery system alongside Kubernetes DNS.
