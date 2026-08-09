@@ -39,9 +39,10 @@ public class DomainRules {
                     "org.springframework.data.redis..",
                     "redis.clients..",
                     "io.micrometer..",
-                    "io.opentelemetry..")
+                    "io.opentelemetry..",
+                    "io.github.resilience4j..")
             .allowEmptyShould(true)
-            .as("Domain should not depend on Kafka, Temporal, Redis, or Micrometer/OpenTelemetry");
+            .as("Domain should not depend on Kafka, Temporal, Redis, Micrometer/OpenTelemetry, or Resilience4j");
 
     @ArchTest
     public static final ArchRule domain_should_not_depend_on_other_layers = noClasses()

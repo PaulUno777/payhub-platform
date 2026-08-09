@@ -27,3 +27,37 @@ payhub:
       enabled: true
       batch-size: 50
       poll-interval-ms: 1000
+
+  resilience:
+    rail:
+      max-conn-total: 4
+      max-conn-per-route: 2
+      bulkhead-max-concurrent: 2
+      bulkhead-max-wait: PT0S
+      timeout: PT3S
+      connect-timeout: PT2S
+      slow-call-duration: PT2S
+      failure-rate-threshold: 50
+      retry-enabled: false
+    finledger:
+      max-conn-total: 16
+      max-conn-per-route: 8
+      bulkhead-max-concurrent: 8
+      bulkhead-max-wait: PT0S
+      timeout: PT5S
+      connect-timeout: PT2S
+      slow-call-duration: PT2S
+      failure-rate-threshold: 50
+      retry-enabled: true
+      retry-max-attempts: 2
+    risk:
+      max-conn-total: 8
+      max-conn-per-route: 4
+      bulkhead-max-concurrent: 4
+      bulkhead-max-wait: PT0S
+      timeout: PT1S
+      connect-timeout: PT1S
+      slow-call-duration: PT800MS
+      failure-rate-threshold: 50
+      retry-enabled: true
+      retry-max-attempts: 2

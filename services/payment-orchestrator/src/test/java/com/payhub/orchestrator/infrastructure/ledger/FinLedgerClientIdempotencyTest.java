@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import com.payhub.orchestrator.application.port.out.LedgerPort;
 import com.payhub.orchestrator.application.port.out.LedgerPort.InitiateRailPaymentCommand;
 import com.payhub.orchestrator.application.port.out.LedgerPort.InitiateRailPaymentResult;
+import com.payhub.orchestrator.infrastructure.resilience.TestDependencyResilience;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -39,7 +40,10 @@ class FinLedgerClientIdempotencyTest {
                 UUID.fromString("00000000-0000-0000-0000-0000000000a1"),
                 false
         );
-        ledgerPort = new FinLedgerClient(RestClient.builder(), properties);
+        RestClient restClient = RestClient.builder()
+                .baseUrl(properties.baseUrl())
+                .build();
+        ledgerPort = new FinLedgerClient(restClient, TestDependencyResilience.permissive());
     }
 
     @AfterEach
