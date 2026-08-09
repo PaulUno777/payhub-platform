@@ -2,10 +2,13 @@
 
 Normative detail lives in plan §6.1.
 
-AsyncAPI (DS-005):
-[`contracts/ledger-journal-entry/asyncapi.yaml`](../contracts/ledger-journal-entry/asyncapi.yaml)
-for `ledger.journal-entry.v1`. CDC wiring: [`platform/kafka/`](../platform/kafka/),
-[ADR-004](adr/DS-ADR-004-finledger-outbox-cdc.md).
+AsyncAPI:
+- [`contracts/ledger-journal-entry/asyncapi.yaml`](../contracts/ledger-journal-entry/asyncapi.yaml)
+  — `ledger.journal-entry.v1` (DS-005). CDC: [`platform/kafka/`](../platform/kafka/),
+  [ADR-004](adr/DS-ADR-004-finledger-outbox-cdc.md).
+- [`contracts/payment-lifecycle/asyncapi.yaml`](../contracts/payment-lifecycle/asyncapi.yaml)
+  — `payment.lifecycle.v1` (DS-007). Orchestrator outbox + poller; helpers in
+  `libraries/payhub-messaging` ([ADR-006](adr/DS-ADR-006-payhub-messaging-outbox-inbox.md)).
 
 | Topic | Producer | Key | Consumers | Retention |
 |-------|----------|-----|-----------|-----------|

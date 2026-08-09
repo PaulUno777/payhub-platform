@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- DS-007: `libraries/payhub-messaging`, orchestrator transactional outbox →
+  `payment.lifecycle.v1`, reporting inbox consumer with retries, ADR-006
 - DS-006: Payment aggregate + idempotent `POST /payments` → `RISK_APPROVED`, Temporal
   `PaymentCaptureWorkflow` (park after start), risk-service sandbox evaluate + ADR-005
 - DS-005: FinLedger outbox → Debezium → Kafka (`ledger.journal-entry.v1`), Schema Registry,
