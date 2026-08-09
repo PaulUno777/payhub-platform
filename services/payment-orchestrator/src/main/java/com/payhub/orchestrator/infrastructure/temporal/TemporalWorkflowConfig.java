@@ -40,12 +40,16 @@ public class TemporalWorkflowConfig {
     WorkerFactory workerFactory(
             WorkflowClient workflowClient,
             TemporalProperties properties,
-            PaymentCaptureActivitiesImpl activities
+            PaymentCaptureActivitiesImpl captureActivities,
+            RefundActivitiesImpl refundActivities
     ) {
         WorkerFactory factory = WorkerFactory.newInstance(workflowClient);
         Worker worker = factory.newWorker(properties.taskQueue());
-        worker.registerWorkflowImplementationTypes(PaymentCaptureWorkflowImpl.class);
-        worker.registerActivitiesImplementations(activities);
+        worker.registerWorkflowImplementationTypes(
+                PaymentCaptureWorkflowImpl.class,
+                RefundWorkflowImpl.class
+        );
+        worker.registerActivitiesImplementations(captureActivities, refundActivities);
         factory.start();
         return factory;
     }

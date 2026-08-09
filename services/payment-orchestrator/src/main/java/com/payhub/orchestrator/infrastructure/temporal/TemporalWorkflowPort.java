@@ -53,4 +53,23 @@ public class TemporalWorkflowPort implements WorkflowPort {
         );
         workflow.continueCapture();
     }
+
+    @Override
+    public void startRefund(RefundStart command) {
+        RefundWorkflow workflow = workflowClient.newWorkflowStub(
+                RefundWorkflow.class,
+                WorkflowOptions.newBuilder()
+                        .setTaskQueue(properties.taskQueue())
+                        .setWorkflowId("payment-refund-" + command.paymentId() + "-" + command.refundAmount())
+                        .build()
+        );
+        WorkflowClient.start(
+                workflow::refund,
+                new RefundWorkflow.RefundInput(
+                        command.paymentId(),
+                        command.refundAmount(),
+                        command.sandboxMode()
+                )
+        );
+    }
 }

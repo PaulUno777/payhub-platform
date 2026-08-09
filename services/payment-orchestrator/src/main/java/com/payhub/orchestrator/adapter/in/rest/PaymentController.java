@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.payhub.orchestrator.application.dto.PaymentView;
+import com.payhub.orchestrator.application.dto.RequestRefundCommand;
 import com.payhub.orchestrator.application.dto.SubmitPaymentCommand;
 import com.payhub.orchestrator.application.port.in.GetPaymentUseCase;
+import com.payhub.orchestrator.application.port.in.RequestRefundUseCase;
 import com.payhub.orchestrator.application.port.in.SubmitPaymentUseCase;
 
 import jakarta.validation.Valid;
@@ -27,13 +29,16 @@ public class PaymentController {
 
     private final SubmitPaymentUseCase submitPaymentUseCase;
     private final GetPaymentUseCase getPaymentUseCase;
+    private final RequestRefundUseCase requestRefundUseCase;
 
     public PaymentController(
             SubmitPaymentUseCase submitPaymentUseCase,
-            GetPaymentUseCase getPaymentUseCase
+            GetPaymentUseCase getPaymentUseCase,
+            RequestRefundUseCase requestRefundUseCase
     ) {
         this.submitPaymentUseCase = submitPaymentUseCase;
         this.getPaymentUseCase = getPaymentUseCase;
+        this.requestRefundUseCase = requestRefundUseCase;
     }
 
     @PostMapping
@@ -57,12 +62,33 @@ public class PaymentController {
         return PaymentResponse.from(getPaymentUseCase.execute(id));
     }
 
+    @PostMapping("/{id}/refunds")
+    public ResponseEntity<PaymentResponse> refund(
+            @PathVariable UUID id,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody RefundRequest request
+    ) {
+        PaymentView view = requestRefundUseCase.execute(new RequestRefundCommand(
+                id,
+                request.amount(),
+                idempotencyKey,
+                request.sandboxMode()
+        ));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(PaymentResponse.from(view));
+    }
+
     public record SubmitRequest(
             @NotNull UUID merchantId,
             @NotNull UUID tenantId,
             @NotBlank String amount,
             @NotBlank String currencyCode,
             @NotBlank String clientReference
+    ) {
+    }
+
+    public record RefundRequest(
+            @NotBlank String amount,
+            String sandboxMode
     ) {
     }
 

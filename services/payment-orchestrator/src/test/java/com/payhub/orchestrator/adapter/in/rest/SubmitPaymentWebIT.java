@@ -104,6 +104,11 @@ class SubmitPaymentWebIT {
                 public void signalContinueCapture(java.util.UUID paymentId) {
                     // no-op in web IT; Temporal disabled
                 }
+
+                @Override
+                public void startRefund(RefundStart command) {
+                    // no-op
+                }
             };
         }
     }
