@@ -5,7 +5,8 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /workspace
 COPY . .
-RUN ./mvnw -B -pl services/notification-service -am package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B -pl services/notification-service -am package -DskipTests
 
 FROM eclipse-temurin:21-jre-jammy
 RUN apt-get update \
