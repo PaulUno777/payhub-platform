@@ -1,0 +1,14 @@
+# Shared defaults for all PayHub services (via Config Server)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: INFO

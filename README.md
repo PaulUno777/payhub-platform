@@ -52,7 +52,7 @@ Hexagonal Spring Boot **4.1.0** modules under [`services/`](services/) (ArchUnit
 
 `gateway`, `merchant-bff`, `ops-bff`, `merchant-service`, `payment-orchestrator`,
 `risk-service`, `rail-adapter-service`, `reconciliation-service`, `reporting-service`,
-`notification-service`
+`notification-service`, plus infra `config-server`
 
 ## Naming (avoid confusion with FinLedger sandbox)
 
@@ -76,9 +76,17 @@ Work proceeds **one DS-0xx ticket at a time** from `develop`
 (see [`docs/development.md`](docs/development.md)):
 
 1. **DS-001** — DDD context map + CAP/PACELC ADR (done)
-2. **DS-002** — Hexagonal skeletons, ArchUnit, Compose, CI (in progress)
-3. **DS-003** — FinLedger `LedgerPort` integration  
+2. **DS-002** — Hexagonal skeletons, ArchUnit, Compose, CI (done)
+3. **DS-003** — Ports, Config Server, FinLedger `LedgerPort` (in progress)
 … through **DS-024** capstone.
+
+## Repo status
+
+Ten hexagonal Spring Boot **4.1.0** services plus **config-server**, Compose Postgres,
+and FinLedger pin. Ports: [`platform/ports.md`](platform/ports.md). Config:
+[`platform/config/`](platform/config/) via Spring Cloud Config.
+
+Current ticket focus: **DS-003** (`ds-003/finledger-integration`).
 
 ## Quick links
 

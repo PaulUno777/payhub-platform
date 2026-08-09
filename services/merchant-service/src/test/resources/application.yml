@@ -1,0 +1,15 @@
+spring:
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+  autoconfigure:
+    exclude: org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
