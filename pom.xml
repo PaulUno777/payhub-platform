@@ -29,6 +29,7 @@
 
 	<modules>
 		<module>build-conventions</module>
+		<module>libraries</module>
 		<module>services/config-server</module>
 		<module>services/gateway</module>
 		<module>services/merchant-bff</module>
@@ -56,6 +57,11 @@
 				<version>${spring-cloud.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>com.payhub</groupId>
+				<artifactId>payhub-messaging</artifactId>
+				<version>${project.version}</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
