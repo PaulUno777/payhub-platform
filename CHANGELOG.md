@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- DS-006: Payment aggregate + idempotent `POST /payments` → `RISK_APPROVED`, Temporal
+  `PaymentCaptureWorkflow` (park after start), risk-service sandbox evaluate + ADR-005
 - DS-005: FinLedger outbox → Debezium → Kafka (`ledger.journal-entry.v1`), Schema Registry,
   AsyncAPI, reporting-service inbox consumer (duplicate delivery = one projection)
 - DS-004: Merchant aggregate (`PENDING_REVIEW` → `ACTIVE`/`REJECTED`), FinLedger
