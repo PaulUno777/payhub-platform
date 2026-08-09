@@ -9,6 +9,8 @@ public interface LedgerPort {
 
     InitiateRailPaymentResult initiateRailPayment(InitiateRailPaymentCommand command);
 
+    ConfirmSettlementResult confirmSettlement(ConfirmSettlementCommand command);
+
     record InitiateRailPaymentCommand(
             UUID tenantId,
             String idempotencyKey,
@@ -27,6 +29,21 @@ public interface LedgerPort {
             String railReference,
             String status,
             UUID initiateJournalEntryId,
+            boolean replayed
+    ) {
+    }
+
+    record ConfirmSettlementCommand(
+            UUID tenantId,
+            String railReference,
+            String idempotencyKey,
+            String bearerToken
+    ) {
+    }
+
+    record ConfirmSettlementResult(
+            String railReference,
+            String status,
             boolean replayed
     ) {
     }
