@@ -460,13 +460,25 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. *Exit : un message poison est isolé sans bloquer les autres partitions.*
 17. **DS-017 — Chaos/load :** Toxiproxy cut on Orchestrator→FinLedger, capacity note in
     [`platform/chaos/`](../platform/chaos/README.md). *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
-18. **DS-018 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
-19. **DS-019 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
-20. **DS-020 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
-21. **DS-021 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
-22. **DS-022 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
-23. **DS-023 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
-24. **DS-024 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
+18. **DS-018 — Container registry & release workflow :** `release.yml` réel — build multi-arch
+    (`linux/amd64`, `linux/arm64`) on push to `main` / version tags → push **GHCR**
+    `ghcr.io/pauluno777/payhub-<service>:<semver>` (see [ADR-008](adr/DS-ADR-008-ghcr-and-kind.md)).
+    Image contract: `:local` for laptop builds, semver for releases; never `:latest` alone.
+    Auth via `GITHUB_TOKEN` only (`packages: write`) — no Docker Hub token for PayHub images.
+    FinLedger stays on its pinned Docker Hub image (external). *Exit : un tag `v0.1.0`
+    déclenche un build+push visible sur GHCR pour au moins un service, vérifiable par
+    `docker pull` hors du repo.*
+19. **DS-019 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB on **kind**
+    (upstream control plane; see ADR-008). **Precondition:** PayHub service images already
+    published on GHCR (DS-018). Local iteration may use `kind load docker-image` +
+    `imagePullPolicy: IfNotPresent`; prod-like path pulls from GHCR in parallel docs — neither
+    replaces the other. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
+20. **DS-020 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
+21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
+22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
+23. **DS-023 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
+24. **DS-024 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
+25. **DS-025 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
 
 ---
 
@@ -497,6 +509,9 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 | Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
 | Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
 | IdP local = Zitadel (Go) + CockroachDB (état IdP seulement) | Keycloak sur Postgres ; Cockroach comme DB métier PayHub | Diversité d'écosystème + OIDC DevContainer ; Postgres reste la DB de chaque service PayHub (ADR-007) |
+| Images PayHub → **GHCR** (`ghcr.io/pauluno777/payhub-*`) ; release via GHA `GITHUB_TOKEN` | Docker Hub pour les images PayHub | Zéro secret registry dédié ; pas de rate-limit d'apprentissage ; FinLedger reste sur Docker Hub (externe) — ADR-008 |
+| Cluster local d'apprentissage = **kind** | k3d / k3s seul | Control plane Kubernetes upstream (etcd observable pour DS-022) ; `kind load` pour itérer, pull GHCR pour le chemin prod-like — ADR-008 |
+| Registry + `release.yml` = ticket dédié (DS-018) avant K8s (DS-019) | Plier publish + kind + failover Temporal dans DS-019 | Une PR = une préoccupation ; critère de sortie de registry vérifiable séparément |
 
 ---
 

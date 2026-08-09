@@ -35,6 +35,6 @@ subsequent call is replay only. See
 
 ## Non-goals (deferred)
 
-- Sustained RPS / latency SLOs (DS-020)
-- Cluster-wide chaos (Chaos Mesh — DS-018+)
+- Sustained RPS / latency SLOs (DS-021)
+- Cluster-wide chaos (Chaos Mesh — DS-019+)
 - Multi-service soak with real FinLedger image under Toxiproxy in Compose

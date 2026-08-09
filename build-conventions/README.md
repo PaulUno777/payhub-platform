@@ -36,5 +36,8 @@ and sibling module POMs:
 docker build -f services/<name>/Dockerfile -t pauluno/payhub-<name>:local .
 ```
 
+Release images (DS-018) go to GHCR: `ghcr.io/pauluno777/payhub-<name>:<semver>`
+([ADR-008](../docs/adr/DS-ADR-008-ghcr-and-kind.md)).
+
 See `platform/compose/OBSERVABILITY.md` for OTLP env vars used the same way in
-Compose and (later) local Kubernetes.
+Compose and (later) local Kubernetes (DS-019 / kind).

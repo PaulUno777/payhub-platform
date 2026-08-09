@@ -44,7 +44,7 @@ OTLP export defaults to **off** in Compose so services do not error-loop when th
 Shared Config Server defaults also live in `platform/config/application.yml`
 (`management.tracing.sampling.probability`).
 
-## Docker images (learning path toward DS-018)
+## Docker images (learning path toward DS-018 / DS-019)
 
 Build **from the repository root** (monorepo reactor needs `libraries/` + all module
 POMs):
@@ -54,10 +54,14 @@ docker build -f services/payment-orchestrator/Dockerfile -t pauluno/payhub-payme
 docker build -f services/reporting-service/Dockerfile -t pauluno/payhub-reporting-service:local .
 ```
 
+Release images (DS-018) publish to GHCR as `ghcr.io/pauluno777/payhub-<service>:<semver>`
+via `.github/workflows/release.yml` — see [ADR-008](../../docs/adr/DS-ADR-008-ghcr-and-kind.md).
+Local `:local` tags remain the Compose / `kind load` fast path.
+
 In-container ports match Compose/K8s: API `8080`, management `8081` (health on
 `8081/actuator/health`). Host port mapping stays in `platform/ports.md`.
 
-For local Kubernetes later (DS-018): same images; set the two env vars above to the
+For local Kubernetes later (DS-019, **kind**): same images; set the two env vars above to the
 in-cluster Jaeger/OTel collector Service DNS (e.g. `http://jaeger:4318/v1/traces`).
 Do not bake endpoints into the image.
 
@@ -81,4 +85,5 @@ full traces URL above.)
 - Kafka: `EventEnvelope.traceparent` on `payment.lifecycle.v1` (Reporting continues the span)
 
 Temporal workflow/activity span linking is out of scope for DS-012.
-Kubernetes Service / Deployment wiring is DS-018 — not started here.
+Kubernetes Service / Deployment wiring is DS-019 — not started here. Image publish to GHCR
+is DS-018 (precondition for prod-like pulls).

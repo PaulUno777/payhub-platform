@@ -78,7 +78,7 @@ Work proceeds **one DS-0xx ticket at a time** from `develop`
 1. **DS-001** — DDD context map + CAP/PACELC ADR (done)
 2. **DS-002** — Hexagonal skeletons, ArchUnit, Compose, CI (done)
 3. **DS-003** — Ports, Config Server, FinLedger `LedgerPort` (in progress)
-… through **DS-024** capstone.
+… through **DS-025** capstone.
 
 ## Repo status
 
