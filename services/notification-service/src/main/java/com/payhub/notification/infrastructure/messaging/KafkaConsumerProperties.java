@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record KafkaConsumerProperties(
         String bootstrapServers,
         String paymentLifecycleTopic,
-        String paymentLifecycleConsumerGroup
+        String paymentLifecycleConsumerGroup,
+        Integer concurrency
 ) {
 
     public KafkaConsumerProperties {
@@ -18,6 +19,9 @@ public record KafkaConsumerProperties(
         }
         if (paymentLifecycleConsumerGroup == null || paymentLifecycleConsumerGroup.isBlank()) {
             paymentLifecycleConsumerGroup = "notification-payment-lifecycle-v1";
+        }
+        if (concurrency == null || concurrency < 1) {
+            concurrency = 2;
         }
     }
 }

@@ -4,7 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -13,8 +15,13 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.FixedBackOff;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+
+import com.payhub.messaging.kafka.KafkaPoisonHandlers;
+
+import tools.jackson.core.JacksonException;
 
 @Configuration
 @EnableKafka
@@ -35,16 +42,34 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    ProducerFactory<String, String> kafkaProducerFactory(KafkaConsumerProperties properties) {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, properties.bootstrapServers());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        return new DefaultKafkaProducerFactory<>(props);
+    }
+
+    @Bean
+    KafkaTemplate<String, String> kafkaTemplate(ProducerFactory<String, String> kafkaProducerFactory) {
+        return new KafkaTemplate<>(kafkaProducerFactory);
+    }
+
+    @Bean
     ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> journalEntryConsumerFactory
+            ConsumerFactory<String, String> journalEntryConsumerFactory,
+            KafkaTemplate<String, String> kafkaTemplate,
+            KafkaConsumerProperties properties
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(journalEntryConsumerFactory);
+        factory.setConcurrency(properties.concurrency());
         factory.getContainerProperties().setAckMode(
                 org.springframework.kafka.listener.ContainerProperties.AckMode.RECORD);
-        // Finite retries (DS-007); dedicated retry topics remain DS-016
-        factory.setCommonErrorHandler(new DefaultErrorHandler(new FixedBackOff(500L, 3L)));
+        factory.setCommonErrorHandler(
+                KafkaPoisonHandlers.defaultErrorHandler(kafkaTemplate, JacksonException.class));
         return factory;
     }
 }

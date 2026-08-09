@@ -36,7 +36,7 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | done |
 | DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | done |
 | DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | done |
-| DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | pending |
+| DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | done |
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | pending |
 | DS-018 | Kubernetes/GitOps: Services/DNS, policies, HPA/KEDA, PDB, secrets, progressive delivery | `ds-018/k8s-gitops` | pending |
 | DS-019 | Data safety: HA DB/Kafka, PITR, restore test, CDC recovery, expand/contract migrations | `ds-019/data-safety` | pending |

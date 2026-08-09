@@ -25,6 +25,12 @@
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-tracing</artifactId>
 		</dependency>
+		<!-- Optional: only needed when wiring KafkaPoisonHandlers (DS-016). -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+			<optional>true</optional>
+		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-tracing-test</artifactId>
