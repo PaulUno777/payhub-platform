@@ -32,6 +32,7 @@ lesson). Docker Hub vs GHCR and kind vs k3d needed an explicit choice.
    neither replaces the other.
 5. **Roadmap split:** DS-018 implements `release.yml` + image contract + exit via
    `docker pull` of a tagged image. DS-019 starts only after that gate is green.
+   Runbook: [`docs/runbooks/ghcr-release.md`](../runbooks/ghcr-release.md).
 
 ## Consequences
 

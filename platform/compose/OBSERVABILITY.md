@@ -55,7 +55,9 @@ docker build -f services/reporting-service/Dockerfile -t pauluno/payhub-reportin
 ```
 
 Release images (DS-018) publish to GHCR as `ghcr.io/pauluno777/payhub-<service>:<semver>`
-via `.github/workflows/release.yml` — see [ADR-008](../../docs/adr/DS-ADR-008-ghcr-and-kind.md).
+via [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — see
+[ADR-008](../../docs/adr/DS-ADR-008-ghcr-and-kind.md) and the cut/verify runbook
+[`docs/runbooks/ghcr-release.md`](../../docs/runbooks/ghcr-release.md).
 Local `:local` tags remain the Compose / `kind load` fast path.
 
 In-container ports match Compose/K8s: API `8080`, management `8081` (health on
