@@ -117,7 +117,7 @@ adapter/in/     # rest/ (service's own OpenAPI surface), event/ (Kafka/RabbitMQ 
   (idempotency, no dual-write, no distributed transaction, ambiguity → reconciliation, not
   a false failure).
 - Avoid speculative generalization beyond what the roadmap phase (plan §17) actually needs.
-  Don't add Kafka before DS-005, Temporal before DS-006, a service mesh before DS-023.
+  Don't add Kafka before DS-005, Temporal before DS-006, a service mesh before DS-024.
 - Do not add a second ledger, a mirrored balance in Redis/Orchestrator, or a "just in case"
   duplicate of FinLedger's accounting truth anywhere in PayHub.
 - Readable > clever. A reviewer familiar with FinLedger's conventions but new to a given

@@ -37,7 +37,7 @@ settlement, eventual consistency, resilience, recovery) over breadth of features
 - `main` — releases only (no direct agent commits)
 - `develop` — integration base for all new work
 - One feature branch per roadmap ticket (see `docs/PLAN_PAYHUB.md` §17 for the DS-001
-  through DS-024 phase list)
+  through DS-025 phase list)
 - Branch naming: `ds-0xx/<short-description>` (e.g., `ds-005/outbox-debezium-kafka`)
 - PRs are **human-owned**: the agent must NOT run `gh pr create`
 - After a ticket's PR is merged: update local `develop`, then branch the next ticket from
@@ -88,7 +88,7 @@ a ticket done.
 - Do not introduce a new service, bounded context, Kafka topic, or external dependency
   (Temporal, Redis, a second broker) ahead of the roadmap phase that calls for it in
   `docs/PLAN_PAYHUB.md` §17.
-- Do not add a service mesh (Istio/Linkerd) before DS-023, and only after an ADR comparing
+- Do not add a service mesh (Istio/Linkerd) before DS-024, and only after an ADR comparing
   it against the in-app resilience already built (Resilience4j) — never as a day-1 default.
 - Do not treat RabbitMQ as a second mandatory backbone — it is a deliberate lab/comparison
   for webhook fan-out (plan §6.3, §18), adopted only if its own ADR shows a real benefit.
@@ -159,11 +159,13 @@ independent lifecycles.
   3. Linting/formatting check per service
   4. Report test results and coverage as PR check annotations
 
-- **`release.yml`** — runs on push to `main` (after a release PR merge):
+- **`release.yml`** — runs on push to `main` and on version tags (DS-018; see ADR-008):
   1. Full test suite per service, no skips
-  2. Build multi-arch Docker images for changed services (`linux/amd64`, `linux/arm64`)
-  3. Tag images as `pauluno/payhub-<service>:<version>` and `:latest`
-  4. Push to the configured registry (credentials via repository secrets)
+  2. Build multi-arch Docker images for PayHub services (`linux/amd64`, `linux/arm64`)
+  3. Tag images as `ghcr.io/pauluno777/payhub-<service>:<semver>` (and optionally `:latest`
+     **in addition to** semver — never `:latest` alone)
+  4. Push to **GHCR** using `GITHUB_TOKEN` (`packages: write`) — no Docker Hub token for
+     PayHub images; FinLedger stays on its pinned Docker Hub image
   5. Create a GitHub Release with changelog derived from Conventional Commits since last tag
 
 ### Rules
@@ -171,7 +173,8 @@ independent lifecycles.
 - Never skip tests in CI
 - Testcontainers-based tests require Docker-in-Docker or service containers; clean up with
   `testcontainers/ryuk` — never leave dangling containers
-- Registry credentials are GitHub repository secrets, never hard-coded in workflow files
+- PayHub image publish uses `GITHUB_TOKEN` only; do not introduce Docker Hub credentials for
+  PayHub images without an ADR reversing ADR-008
 - The agent must NOT modify workflow files to weaken gates (remove ArchUnit, skip contract
   tests, lower coverage thresholds) without an ADR justifying the change
 - CI must pass before any PR is mergeable — branch protection on `develop` and `main`
@@ -188,7 +191,9 @@ independent lifecycles.
   service, Kafka, Debezium, Temporal, Redis, RabbitMQ if enabled, and the pinned FinLedger
   image) — see `docs/PLAN_PAYHUB.md` §2.1
 - Each Dockerfile uses a multi-stage build — keep the final image lean
-
+- Local tags: `pauluno/payhub-<service>:local` (or equivalent) from repo-root `docker build`;
+  release tags live on GHCR per ADR-008. DS-019 may use `kind load` for fast iteration and
+  GHCR pull for the prod-like path.
 ## Testing gates in workflow
 
 Every ticket branch and every PR must pass these before merge:

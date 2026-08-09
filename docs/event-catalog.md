@@ -15,7 +15,11 @@ AsyncAPI:
 | `payment.lifecycle.v1` | Orchestrator | `paymentId` | Reporting, Notification, Reconciliation | 30d |
 | `ledger.journal-entry.v1` | FinLedger CDC | `journalEntryId` | Reporting, Reconciliation | 90d |
 | `rail.operation.v1` | Rail Adapter | `railOperationId` | Orchestrator, Reconciliation | 30d |
-| `*.retry.*` / `*.dlq` | consumers | original key | replay tooling | dedicated |
+| `{topic}.dlq` | consumer `DeadLetterPublishingRecoverer` | original key | Reporting replay (`POST .../events/dlq/replay`) | ops |
+| `*.retry.*` | — | — | deferred (v1: in-listener `FixedBackOff`) | — |
+
+DLQ topics are operational (not AsyncAPI business channels). See
+[`runbooks/kafka-poison-messages.md`](runbooks/kafka-poison-messages.md).
 
 **Not in v1:** `tenant.events.v1`, `ledger.account-impact.v1` (plan §19).
 

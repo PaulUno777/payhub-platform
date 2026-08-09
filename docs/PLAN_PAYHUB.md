@@ -337,7 +337,7 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 | `payment.lifecycle.v1` | Orchestrator | `paymentId` | Reporting, Notification, Reconciliation | 30 jours |
 | `ledger.journal-entry.v1` | FinLedger CDC | `journalEntryId` | Reporting, Reconciliation | 90 jours |
 | `rail.operation.v1` | Rail Adapter | `railOperationId` | Orchestrator, Reconciliation | 30 jours |
-| `*.retry.*` / `*.dlq` | consumers | clé d'origine | outil de replay | politique dédiée |
+| `*.retry.*` / `{topic}.dlq` | consumers → DLQ; ops replay | clé d'origine | Reporting replay + runbook; `*.retry.*` deferred | politique dédiée |
 
 **Suppressions vs v1** : `tenant.events.v1` (aucun "control plane" PayHub réel — la création de tenant reste une opération `platform:admin` sur FinLedger, consommée via API, pas via topic) et `ledger.account-impact.v1` (Reporting dérive l'impact compte directement des postings de `ledger.journal-entry.v1`, sans second topic dédié tant que le besoin n'est pas prouvé — §0.2.8).
 
@@ -345,7 +345,12 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 - Producer path: Orchestrator transactional outbox → relay → `payment.lifecycle.v1` (key `paymentId`).
 - Consumers (Reporting, Notification, later Reconciliation) use inbox-before-action on `eventId`.
-- Finite in-listener retries (DefaultErrorHandler); dedicated `*.retry.*` / platform DLQ tooling is DS-016.
+- Finite in-listener retries (`DefaultErrorHandler` + `FixedBackOff`), then isolate to
+  `{originalTopic}.dlq` via `DeadLetterPublishingRecoverer` (DS-016). Shared helper:
+  `libraries/payhub-messaging` `KafkaPoisonHandlers`. Consumer concurrency defaults to 2 so a
+  poison partition does not stall others. Replay: `POST /api/v1/reporting/events/dlq/replay`
+  (runbook [`docs/runbooks/kafka-poison-messages.md`](runbooks/kafka-poison-messages.md)).
+- Dedicated delayed `{topic}.retry.*` chains are **deferred**; v1 keeps in-listener retry + `.dlq`.
 - Notification (DS-014) does **not** rely on Kafka retry topics for merchant webhooks: it persists `WebhookDelivery` rows and retries HTTP delivery in-process; exhausted attempts become status `DEAD` (observable via `GET /api/v1/webhooks/dlq` / Ops `GET /ops/notifications/dlq`).
 
 ### 6.3 RabbitMQ lab (optional — not the v1 backbone)
@@ -452,15 +457,28 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 13. **DS-013 — CQRS :** Reporting projection, staleness, Redis cache-aside. *Exit : une lecture Reporting expose son `asOf`/lag, jamais présentée comme à jour par défaut.*
 14. **DS-014 — Notifications :** webhooks signés, retries, DLQ; POC RabbitMQ documenté. *Exit : une livraison webhook échouée finit en DLQ observable, jamais perdue silencieusement.*
 15. **DS-015 — Résilience :** budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure. *Exit : un rail lent n'épuise pas le pool de connexions FinLedger (bulkhead prouvé sous charge).*
-16. **DS-016 — Event operations :** retry topics, replay tool, quotas, rebalances. *Exit : un message poison est isolé sans bloquer les autres partitions.*
-17. **DS-017 — Chaos/load :** injection de pannes, blast radius, capacity report. *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
-18. **DS-018 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
-19. **DS-019 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
-20. **DS-020 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
-21. **DS-021 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
-22. **DS-022 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
-23. **DS-023 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
-24. **DS-024 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
+16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. *Exit : un message poison est isolé sans bloquer les autres partitions.*
+17. **DS-017 — Chaos/load :** Toxiproxy cut on Orchestrator→FinLedger, capacity note in
+    [`platform/chaos/`](../platform/chaos/README.md). *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
+18. **DS-018 — Container registry & release workflow :** `release.yml` réel — build multi-arch
+    (`linux/amd64`, `linux/arm64`) on push to `main` / version tags → push **GHCR**
+    `ghcr.io/pauluno777/payhub-<service>:<semver>` (see [ADR-008](adr/DS-ADR-008-ghcr-and-kind.md)).
+    Image contract: `:local` for laptop builds, semver for releases; never `:latest` alone.
+    Auth via `GITHUB_TOKEN` only (`packages: write`) — no Docker Hub token for PayHub images.
+    FinLedger stays on its pinned Docker Hub image (external). *Exit : un tag `v0.1.0`
+    déclenche un build+push visible sur GHCR pour au moins un service, vérifiable par
+    `docker pull` hors du repo.*
+19. **DS-019 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB on **kind**
+    (upstream control plane; see ADR-008). **Precondition:** PayHub service images already
+    published on GHCR (DS-018). Local iteration may use `kind load docker-image` +
+    `imagePullPolicy: IfNotPresent`; prod-like path pulls from GHCR in parallel docs — neither
+    replaces the other. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
+20. **DS-020 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
+21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
+22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
+23. **DS-023 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
+24. **DS-024 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
+25. **DS-025 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
 
 ---
 
@@ -491,6 +509,9 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 | Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
 | Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
 | IdP local = Zitadel (Go) + CockroachDB (état IdP seulement) | Keycloak sur Postgres ; Cockroach comme DB métier PayHub | Diversité d'écosystème + OIDC DevContainer ; Postgres reste la DB de chaque service PayHub (ADR-007) |
+| Images PayHub → **GHCR** (`ghcr.io/pauluno777/payhub-*`) ; release via GHA `GITHUB_TOKEN` | Docker Hub pour les images PayHub | Zéro secret registry dédié ; pas de rate-limit d'apprentissage ; FinLedger reste sur Docker Hub (externe) — ADR-008 |
+| Cluster local d'apprentissage = **kind** | k3d / k3s seul | Control plane Kubernetes upstream (etcd observable pour DS-022) ; `kind load` pour itérer, pull GHCR pour le chemin prod-like — ADR-008 |
+| Registry + `release.yml` = ticket dédié (DS-018) avant K8s (DS-019) | Plier publish + kind + failover Temporal dans DS-019 | Une PR = une préoccupation ; critère de sortie de registry vérifiable séparément |
 
 ---
 
