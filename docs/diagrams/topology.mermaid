@@ -1,0 +1,63 @@
+flowchart TB
+  subgraph edge["Edge"]
+    GW[API Gateway]
+  end
+  subgraph bff["BFFs"]
+    MBFF[Merchant BFF]
+    OBFF[Ops BFF]
+  end
+  subgraph core["Core services"]
+    ORCH["Payment Orchestrator<br/>ONLY caller of FinLedger<br/>rails/payments settle splits refunds"]
+    MS["Merchant Service<br/>own FinLedger ACL: account provisioning only"]
+    RISK[Risk Service]
+    RAIL["Rail Adapter Service<br/>PSP only — NEVER calls FinLedger"]
+    RECON[Reconciliation Service]
+    REPORT[Reporting Service]
+    NOTIF[Notification Service]
+  end
+  subgraph workflow["Workflow"]
+    TMP[Temporal]
+  end
+  subgraph bus["Kafka KRaft — 1 broker, no ZooKeeper"]
+    T1[payment.lifecycle.v1]
+    T2[ledger.journal-entry.v1]
+    T3[rail.operation.v1]
+  end
+  FL[("FinLedger<br/>never forked")]
+  PSP[/"PSP sandbox: MmSandbox"/]
+  ZIT["Zitadel<br/>OIDC issuer — Organizations = native multi-tenancy"]
+  PGzit[("postgres-zitadel<br/>dedicated IdP instance")]
+  RD[(Redis cache-aside)]
+
+  GW -.->|validates JWT JWKS| ZIT
+  MBFF -.->|validates JWT JWKS| ZIT
+  OBFF -.->|validates JWT JWKS| ZIT
+  ZIT --> PGzit
+
+  GW --> MBFF
+  GW --> OBFF
+  MBFF --> ORCH
+  OBFF --> RECON
+  OBFF --> MS
+  OBFF --> ORCH
+
+  ORCH -->|RiskPort sync| RISK
+  ORCH -->|MerchantPort| MS
+  ORCH -->|RailProviderPort facade| RAIL
+  ORCH -->|WorkflowPort| TMP
+  RAIL -->|real conversation| PSP
+  ORCH -->|LedgerPort| FL
+  MS -->|AccountProvisioningPort| FL
+
+  FL -->|outbox CDC| T2
+  ORCH -->|produces| T1
+  RAIL -->|produces| T3
+
+  T1 --> REPORT
+  T1 --> NOTIF
+  T1 --> RECON
+  T2 --> REPORT
+  T2 --> RECON
+  T3 --> ORCH
+  T3 --> RECON
+  REPORT --> RD

@@ -1,0 +1,84 @@
+flowchart TB
+  subgraph ds019_lab["DS-019 lab — kind single-node — Temporal failover only"]
+    ORCH19["Deployment: payment-orchestrator<br/>replicas: 2 — shared task queue payment-capture"]
+    TMP19["Deployment: temporal"]
+    PGo19["postgres-orchestrator"]
+    PGtmp19["postgres-temporal"]
+    PDB19["PDB minAvailable=1"]
+    ORCH19 -.->|governed by| PDB19
+    ORCH19 --> TMP19
+    TMP19 --> PGtmp19
+    ORCH19 --> PGo19
+  end
+
+  subgraph ds020_mesh_target["DS-020 mesh target — same kind single-node — RAM tension assumed"]
+    direction TB
+    noteRam["Laptop Mac 16GB / Docker VM ~8GB useful<br/>Hot estimate ~10-11.5GB — no permanent multi-node<br/>PG tune: max_connections=20 shared_buffers=32MB work_mem=4MB<br/>JVM: UseSerialGC MaxRAMPercentage=75"]
+
+    subgraph appsTier["Apps — SerialGC MaxRAMPercentage=75"]
+      GWd["gateway"]
+      ORCHd["payment-orchestrator x2"]
+      MSd["merchant-service"]
+      RSd["risk-service"]
+      RAd["rail-adapter-service"]
+      RCd["reconciliation-service"]
+      RPd["reporting-service"]
+      NTd["notification-service"]
+      BFFd["merchant-bff / ops-bff"]
+    end
+
+    subgraph dataTier["Datastores — 1 Postgres instance PER service — tuned"]
+      PGm["postgres-merchant"]
+      PGo["postgres-orchestrator"]
+      PGr["postgres-risk"]
+      PGra["postgres-rail"]
+      PGrc["postgres-reconciliation"]
+      PGrp["postgres-reporting"]
+      PGn["postgres-notification"]
+      KF["kafka KRaft 1 broker — no ZooKeeper"]
+      RD["redis"]
+      FLd["finledger pinned image"]
+      PGfl["postgres-finledger"]
+    end
+
+    subgraph tempTier["Temporal"]
+      TMP["temporal"]
+      PGtmp["postgres-temporal"]
+    end
+
+    subgraph iamTier["IAM — ADR-007 amended"]
+      ZIT["zitadel OIDC"]
+      PGzit["postgres-zitadel dedicated"]
+    end
+
+    PDB["PDB orchestrator minAvailable=1"]
+  end
+
+  subgraph later["Later — not always-on DS-020"]
+    PROM["prometheus / grafana — DS-021"]
+    ARGO["ArgoCD or Flux — post-DS-021"]
+    RMQ["rabbitmq — DS-014 lab overlay only"]
+  end
+
+  ORCHd -.->|governed by| PDB
+  ORCHd --> TMP
+  TMP --> PGtmp
+  ORCHd --> PGo
+  ORCHd -->|LedgerPort| FLd
+  FLd --> PGfl
+  ORCHd --> KF
+  MSd --> PGm
+  RSd --> PGr
+  RAd --> PGra
+  RAd --> KF
+  RCd --> PGrc
+  RPd --> PGrp
+  RPd --> RD
+  NTd --> PGn
+
+  GWd -->|JWKS| ZIT
+  BFFd -->|JWKS| ZIT
+  ZIT --> PGzit
+
+  ds019_lab -.->|then| ds020_mesh_target
+  ds020_mesh_target -.->|optional| later

@@ -140,6 +140,27 @@ users Ops/Merchant de démo. Les services comparent ce claim à
 **À lever :** si un vrai multi-org Zitadel doit dériver automatiquement le UUID FinLedger
 `SUB_MERCHANT` sans claim custom — hors exit DS-011.
 
+### Q18 — Plan B : offload cloud si OOM / swap sur kind laptop ?
+
+**Contexte :** Mac Intel 16 Go avec Docker Desktop ~8 Go utile ; mesh DS-020 estimé
+~10–11.5 Go à chaud = tension RAM assumée malgré tuning (Postgres-per-service bridé,
+Kafka KRaft 1 broker, JVM SerialGC / MaxRAMPercentage, Zitadel→Postgres — ADR-007/008
+amendés). Multi-node kind permanent sur le laptop est **rejeté** (overhead kubelet sans
+gain pédagogique pour DS-019–021).
+
+**Plan B (si swap / OOMKiller récurrent après les levers documentés) :** bascule
+temporaire vers un cluster distant (ex. Civo, Oracle Free Tier, ou équivalent) pour
+poursuivre le lab mesh / data-safety, sans changer l’architecture applicative.
+
+**Critères de bascule (à cocher avant d’ouvrir le cluster cloud) :**
+1. Tuning Postgres / JVM / Kafka appliqué et mesuré (mémoire pods documentée).
+2. Services non essentiels stoppés (pas de RabbitMQ always-on ; overlays optionnels off).
+3. OOM ou swap macOS encore observé sur une session mesh DS-020 représentative.
+
+**À lever :** choisir le provider exact + secrets/CI au moment de la bascule ; consigner
+le choix dans une ADR courte si le cloud devient le chemin par défaut (pas seulement un
+secours).
+
 ## Comment utiliser ce registre
 
 - Nouvelle question ouverte pendant un ticket DS-0xx → ajouter une entrée ici avant de
