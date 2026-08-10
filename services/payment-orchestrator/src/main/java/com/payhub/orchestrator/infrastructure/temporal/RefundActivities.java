@@ -5,7 +5,7 @@ import java.util.UUID;
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
-@ActivityInterface
+@ActivityInterface(namePrefix = "Refund_")
 public interface RefundActivities {
 
     @ActivityMethod
