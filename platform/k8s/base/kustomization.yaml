@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: payhub
+resources:
+  - namespace.yaml
+  - temporal/postgres-temporal.yaml
+  - temporal/temporal.yaml
+  - postgres-orchestrator/postgres-orchestrator.yaml
+  - payment-orchestrator/payment-orchestrator.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: payhub
+      payhub.io/ticket: ds-019
+    includeSelectors: false

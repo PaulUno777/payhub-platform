@@ -33,6 +33,9 @@ lesson). Docker Hub vs GHCR and kind vs k3d needed an explicit choice.
 5. **Roadmap split:** DS-018 implements `release.yml` + image contract + exit via
    `docker pull` of a tagged image. DS-019 starts only after that gate is green.
    Runbook: [`docs/runbooks/ghcr-release.md`](../runbooks/ghcr-release.md).
+   Kind + Temporal worker failover (kustomize, not full mesh): 
+   [`docs/runbooks/kind-temporal-failover.md`](../runbooks/kind-temporal-failover.md),
+   manifests under `platform/k8s/`.
 
 ## Consequences
 
