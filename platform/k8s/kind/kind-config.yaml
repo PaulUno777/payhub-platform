@@ -1,0 +1,20 @@
+# Single-node kind cluster for DS-019 (Temporal worker failover lab).
+# Create: kind create cluster --name payhub --config platform/k8s/kind/kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: payhub
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Temporal frontend (host → node)
+      - containerPort: 30233
+        hostPort: 7233
+        protocol: TCP
+      # payment-orchestrator HTTP
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      # payment-orchestrator management / health
+      - containerPort: 30081
+        hostPort: 8081
+        protocol: TCP

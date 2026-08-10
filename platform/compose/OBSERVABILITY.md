@@ -87,5 +87,6 @@ full traces URL above.)
 - Kafka: `EventEnvelope.traceparent` on `payment.lifecycle.v1` (Reporting continues the span)
 
 Temporal workflow/activity span linking is out of scope for DS-012.
-Kubernetes Service / Deployment wiring is DS-019 — not started here. Image publish to GHCR
-is DS-018 (precondition for prod-like pulls).
+Kubernetes Service / Deployment wiring is DS-019 — see [`platform/k8s/`](../../platform/k8s/)
+and [`docs/runbooks/kind-temporal-failover.md`](../../docs/runbooks/kind-temporal-failover.md).
+Image publish to GHCR is DS-018 (precondition for prod-like pulls).

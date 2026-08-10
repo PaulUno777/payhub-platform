@@ -472,7 +472,10 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
     (upstream control plane; see ADR-008). **Precondition:** PayHub service images already
     published on GHCR (DS-018). Local iteration may use `kind load docker-image` +
     `imagePullPolicy: IfNotPresent`; prod-like path pulls from GHCR in parallel docs — neither
-    replaces the other. *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
+    replaces the other. v1 deliverable: kustomize under `platform/k8s/` with Temporal +
+    2× `payment-orchestrator` workers; full mesh / ArgoCD / HPA deferred.
+    Runbook: [`docs/runbooks/kind-temporal-failover.md`](runbooks/kind-temporal-failover.md).
+    *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
 20. **DS-020 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
 21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
 22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
