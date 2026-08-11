@@ -30,14 +30,35 @@ spec:
       labels:
         app.kubernetes.io/name: temporal
     spec:
+      # auto-setup must see a ready Postgres or schema setup is skipped / empty.
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-temporal -U temporal -d temporal; do
+                echo "waiting for postgres-temporal..."
+                sleep 2
+              done
       containers:
         - name: temporal
           image: temporalio/auto-setup:1.25.2
+          imagePullPolicy: IfNotPresent
+          # Image entrypoint only runs /etc/temporal/auto-setup.sh when this arg is present
+          # (Compose inherits the image CMD; bare K8s Deployment does not).
+          args: ["autosetup"]
           env:
             - name: DB
               value: postgres12
             - name: DB_PORT
               value: "5432"
+            - name: DBNAME
+              value: temporal
+            - name: VISIBILITY_DBNAME
+              value: temporal_visibility
             - name: POSTGRES_USER
               value: temporal
             - name: POSTGRES_PWD
@@ -49,12 +70,13 @@ spec:
           readinessProbe:
             tcpSocket:
               port: 7233
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 12
+            failureThreshold: 18
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
             limits:
+              cpu: 500m
               memory: 1Gi

@@ -6,11 +6,5 @@ images:
   - name: ghcr.io/pauluno777/payhub-payment-orchestrator
     newName: pauluno/payhub-payment-orchestrator
     newTag: local
-patches:
-  - target:
-      kind: Deployment
-      name: payment-orchestrator
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/imagePullPolicy
-        value: Never
+# IfNotPresent (not Never): multi-arch OCI indexes from GHCR retags fail with Never
+# even after kind load. Load images first, then apply.
