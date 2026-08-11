@@ -1,6 +1,7 @@
 # Plan Complet — PayHub, plateforme fintech distribuée autour de FinLedger
 
-### Spring Boot · DDD · Clean/Hexagonal · Event-driven · Sagas · Observable · Recoverable
+## Spring Boot · DDD · Clean/Hexagonal · Event-driven · Sagas · Observable · Recoverable
+
 ---
 
 ## 0. Vision et principes directeurs
@@ -13,10 +14,10 @@ Le but n'est pas de recréer Stripe ou Adyen. Le but est d'apprendre à concevoi
 
 FinLedger reste un dépôt, un produit et un bounded context indépendants. PayHub le consomme via son contrat REST/OpenAPI et ses événements outbox; il ne le fork pas, ne l'étend pas via SPI, et ne lit jamais ses tables directement.
 
-| FinLedger possède | PayHub possède |
-| --- | --- |
+| FinLedger possède                                                                                                                                                                             | PayHub possède                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | comptes, écritures double-entry, holds/projections de solde, audit, taux, arithmétique de split (`%`, HALF_EVEN), politique de fee-reversal, refunds natifs, rail lifecycle (PENDING/SETTLED) | intention de paiement, cycle de vie externe, workflow, décision risque, conversation PSP réelle, reconciliation, onboarding marchand, projections UX, webhooks sortants |
-| vérité monétaire et invariants comptables | orchestration et état opérationnel du paiement/marchand |
+| vérité monétaire et invariants comptables                                                                                                                                                     | orchestration et état opérationnel du paiement/marchand                                                                                                                 |
 
 **Règle absolue :** aucun service PayHub ne stocke un solde autoritaire, ne recalcule un split, ni ne réimplémente une politique de reversal de frais. Toute conséquence monétaire passe par l'API idempotente de FinLedger — y compris pour les remboursements et les splits, qui ont chacun leur propre endpoint natif (`POST .../refunds`, `POST .../splits`), jamais un contournement via `journal-entries`.
 
@@ -25,7 +26,7 @@ FinLedger reste un dépôt, un produit et un bounded context indépendants. PayH
 ### 0.2 Principes d'architecture
 
 1. **Un seul scénario complet avant toute généralisation.** Une devise, un rail sandbox, un type de paiement, un flux capture/refund et un agrégateur hiérarchique.
-2. **DDD, microservices dès le départ.** Chaque service correspond à un bounded context, possède son modèle et ses données, et communique par contrat. *(Décision tranchée : PayHub démarre directement en 10 services indépendants — voir §19 pour l'ADR correspondant. Le principe "monolithe d'abord" envisagé en v1 de ce plan est abandonné au profit d'un apprentissage direct des frontières inter-services, objectif prioritaire du projet.)*
+2. **DDD, microservices dès le départ.** Chaque service correspond à un bounded context, possède son modèle et ses données, et communique par contrat. _(Décision tranchée : PayHub démarre directement en 10 services indépendants — voir §19 pour l'ADR correspondant. Le principe "monolithe d'abord" envisagé en v1 de ce plan est abandonné au profit d'un apprentissage direct des frontières inter-services, objectif prioritaire du projet.)_
 3. **Jamais de base partagée.** Chaque service possède sa propre base/schéma; aucun accès direct à la base d'un autre service ni à celle de FinLedger.
 4. **ACID local, BASE entre services.** Une transaction PostgreSQL locale protège l'état et l'outbox; entre services, saga, compensation, inbox et réconciliation remplacent 2PC/XA.
 5. **At-least-once assumé.** La livraison est au moins une fois; l'effet métier est effectivement unique grâce aux idempotency keys, contraintes uniques et déduplication.
@@ -36,13 +37,13 @@ FinLedger reste un dépôt, un produit et un bounded context indépendants. PayH
 
 ### 0.3 Cadrage carrière — pourquoi ce projet, maintenant
 
-| Compétence évaluée en entretien | Preuve produite par PayHub |
-| --- | --- |
-| "Comment garantis-tu l'idempotence dans un système distribué ?" | §5 — idempotency records, inbox/outbox, `at-least-once + effet unique`, testé sous chaos (§14) |
-| "Comment gères-tu une transaction qui touche plusieurs services ?" | §4 — sagas Temporal (paiement + refund) documentées, compensation explicite, rejet argumenté de 2PC/XA |
-| "Comment raisonnes-tu sur CAP/PACELC dans un vrai système ?" | §3.3 — tableau de choix par composant |
-| "Décris un incident que tu as géré et comment tu l'as diagnostiqué." | §12/§14 — game days chaos codifiés |
-| "Comment structures-tu les bounded contexts d'un système de paiement ?" | §1.2/§1.3 — context map et langage ubiquitaire |
+| Compétence évaluée en entretien                                              | Preuve produite par PayHub                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| "Comment garantis-tu l'idempotence dans un système distribué ?"              | §5 — idempotency records, inbox/outbox, `at-least-once + effet unique`, testé sous chaos (§14)               |
+| "Comment gères-tu une transaction qui touche plusieurs services ?"           | §4 — sagas Temporal (paiement + refund) documentées, compensation explicite, rejet argumenté de 2PC/XA       |
+| "Comment raisonnes-tu sur CAP/PACELC dans un vrai système ?"                 | §3.3 — tableau de choix par composant                                                                        |
+| "Décris un incident que tu as géré et comment tu l'as diagnostiqué."         | §12/§14 — game days chaos codifiés                                                                           |
+| "Comment structures-tu les bounded contexts d'un système de paiement ?"      | §1.2/§1.3 — context map et langage ubiquitaire                                                               |
 | "Quand consommes-tu une capacité existante plutôt que d'en réinventer une ?" | §0.1/§0.2.9 — la découverte du split/refund/rails natifs de FinLedger et la correction de design qui a suivi |
 
 ---
@@ -51,22 +52,22 @@ FinLedger reste un dépôt, un produit et un bounded context indépendants. PayH
 
 ### 1.1 Le flux EcoPay Network
 
-Un sous-marchand d'EcoPay (onboardé et actif) crée un paiement de 100 USD (devise v1 alignée sur le sandbox FinLedger `aggregator`). PayHub évalue le risque, sélectionne une règle de split déjà provisionnée côté FinLedger, soumet l'opération au PSP mobile-money stub (**MmSandbox** — ne pas confondre avec le label FinLedger « Send Tunnel », qui désigne le *sous-marchand* seedé), et **seulement après acceptation PSP** crée le PENDING FinLedger puis confirme le settlement (`.../settle`), déclenche le split, réconcilie un relevé rail, gère un éventuel remboursement et notifie le marchand.
+Un sous-marchand d'EcoPay (onboardé et actif) crée un paiement de 100 USD (devise v1 alignée sur le sandbox FinLedger `aggregator`). PayHub évalue le risque, sélectionne une règle de split déjà provisionnée côté FinLedger, soumet l'opération au PSP mobile-money stub (**MmSandbox** — ne pas confondre avec le label FinLedger « Send Tunnel », qui désigne le _sous-marchand_ seedé), et **seulement après acceptation PSP** crée le PENDING FinLedger puis confirme le settlement (`.../settle`), déclenche le split, réconcilie un relevé rail, gère un éventuel remboursement et notifie le marchand.
 
 ### 1.2 Bounded contexts
 
-| Bounded context | Agrégat principal | Responsabilité | Données détenues |
-| --- | --- | --- | --- |
-| Merchant | `Merchant` | onboarding, statut, tier, règle de split assignée ; provisioning FinLedger `SUB_MERCHANT` | statut, tier, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets |
-| Payment Orchestrator | `Payment` | intention, état, saga paiement + saga refund, commandes métier | paiement, refund, idempotence, outbox |
-| Risk | `RiskAssessment` | règles, limites, review manuelle | décision, raisons, versions de règles |
-| Rail Adapter | `RailOperation` | conversation PSP réelle uniquement — jamais d'appel FinLedger | opération fournisseur, attempts, raw payload chiffré |
-| Reconciliation | `ReconciliationRun`, `Break` | rapprochement statement/rail/ledger et résolution | lignes importées, breaks, décisions opérateur |
-| Reporting | `PaymentView` | projections CQRS et recherche | tables dérivées, offsets, staleness |
-| Notification | `WebhookDelivery` | livraison sortante et retry | endpoint, tentatives, reçu, idempotence |
-| Merchant BFF | — | API orientée intégrateur/marchand | aucune vérité métier; cache optionnel |
-| Ops BFF | — | revue risque, breaks, DLQ, approbation marchand, refund admin | aucune vérité métier; vues composées |
-| FinLedger | `JournalEntry` | vérité financière, split, refund policy, rail lifecycle comptable | propriété exclusive de FinLedger |
+| Bounded context      | Agrégat principal            | Responsabilité                                                                            | Données détenues                                                      |
+| -------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Merchant             | `Merchant`                   | onboarding, statut, tier, règle de split assignée ; provisioning FinLedger `SUB_MERCHANT` | statut, tier, `assignedRuleSetKey`, `finLedgerTenantId`, refs wallets |
+| Payment Orchestrator | `Payment`                    | intention, état, saga paiement + saga refund, commandes métier                            | paiement, refund, idempotence, outbox                                 |
+| Risk                 | `RiskAssessment`             | règles, limites, review manuelle                                                          | décision, raisons, versions de règles                                 |
+| Rail Adapter         | `RailOperation`              | conversation PSP réelle uniquement — jamais d'appel FinLedger                             | opération fournisseur, attempts, raw payload chiffré                  |
+| Reconciliation       | `ReconciliationRun`, `Break` | rapprochement statement/rail/ledger et résolution                                         | lignes importées, breaks, décisions opérateur                         |
+| Reporting            | `PaymentView`                | projections CQRS et recherche                                                             | tables dérivées, offsets, staleness                                   |
+| Notification         | `WebhookDelivery`            | livraison sortante et retry                                                               | endpoint, tentatives, reçu, idempotence                               |
+| Merchant BFF         | —                            | API orientée intégrateur/marchand                                                         | aucune vérité métier; cache optionnel                                 |
+| Ops BFF              | —                            | revue risque, breaks, DLQ, approbation marchand, refund admin                             | aucune vérité métier; vues composées                                  |
+| FinLedger            | `JournalEntry`               | vérité financière, split, refund policy, rail lifecycle comptable                         | propriété exclusive de FinLedger                                      |
 
 ### 1.3 Langage ubiquitaire
 
@@ -170,55 +171,55 @@ Les transitions sont validées par l'agrégat `Payment`. Les événements extern
 
 ### 2.1 Dépôt et modules
 
-```
+```md
 payhub-platform/
 ├── docs/
-│   ├── adr/
-│   ├── diagrams/                # topology + kind namespace phases (DS-019 / DS-020)
-│   ├── context-map.md
-│   ├── event-catalog.md
-│   ├── OPEN_QUESTIONS.md
-│   ├── runbooks/
-│   └── threat-model.md
-├── build-conventions/          # ArchUnit de base, Checkstyle/Spotless, fixtures de test partagées
+│ ├── adr/
+│ ├── diagrams/ # topology + kind namespace phases (DS-019 / DS-020)
+│ ├── context-map.md
+│ ├── event-catalog.md
+│ ├── OPEN_QUESTIONS.md
+│ ├── runbooks/
+│ └── threat-model.md
+├── build-conventions/ # ArchUnit de base, Checkstyle/Spotless, fixtures de test partagées
 ├── services/
-│   ├── config-server/           # infra — Spring Cloud Config (pas un bounded context)
-│   ├── gateway/
-│   ├── merchant-bff/
-│   ├── ops-bff/
-│   ├── merchant-service/        # onboarding, statut, tier, règle de split assignée
-│   ├── payment-orchestrator/     # Payment + Refund workflows
-│   ├── risk-service/
-│   ├── rail-adapter-service/
-│   ├── reconciliation-service/
-│   ├── reporting-service/
-│   └── notification-service/
+│ ├── config-server/ # infra — Spring Cloud Config (pas un bounded context)
+│ ├── gateway/
+│ ├── merchant-bff/
+│ ├── ops-bff/
+│ ├── merchant-service/ # onboarding, statut, tier, règle de split assignée
+│ ├── payment-orchestrator/ # Payment + Refund workflows
+│ ├── risk-service/
+│ ├── rail-adapter-service/
+│ ├── reconciliation-service/
+│ ├── reporting-service/
+│ └── notification-service/
 ├── contracts/
 ├── platform/
-│   ├── ports.md                 # table ports host / noms logiques (registry DNS)
-│   ├── config/                  # YAML multi-profil servi par config-server
-│   ├── compose/
-│   ├── kafka/
-│   ├── k8s/
-│   ├── observability/
-│   └── chaos/
-└── finledger/                   # image digest/config + copie de référence d'INTEGRATION_GUIDE.md
+│ ├── ports.md # table ports host / noms logiques (registry DNS)
+│ ├── config/ # YAML multi-profil servi par config-server
+│ ├── compose/
+│ ├── kafka/
+│ ├── k8s/
+│ ├── observability/
+│ └── chaos/
+└── finledger/ # image digest/config + copie de référence d'INTEGRATION_GUIDE.md
 ```
 
 ### 2.2 Ports structurants
 
-| Service | Port sortant | Adapter initial |
-| --- | --- | --- |
-| Orchestrator | `LedgerPort` | **seul** client paiement/refund FinLedger (`rails/payments`, `.../settle`, `.../splits`, `.../refunds`) |
-| Orchestrator | `RailPort` | REST interne vers `rail-adapter-service` (soumission PSP + statut) — jamais FinLedger |
-| Orchestrator | `WorkflowPort` | Temporal (`PaymentCaptureWorkflow`, `RefundWorkflow`) |
-| Orchestrator | `RiskPort` | REST interne / adapter in-memory pour tests |
-| Orchestrator | `MerchantPort` | REST interne vers `merchant-service` (`merchantId → assignedRuleSetKey`) |
+| Service          | Port sortant              | Adapter initial                                                                                                                |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Orchestrator     | `LedgerPort`              | **seul** client paiement/refund FinLedger (`rails/payments`, `.../settle`, `.../splits`, `.../refunds`)                        |
+| Orchestrator     | `RailPort`                | REST interne vers `rail-adapter-service` (soumission PSP + statut) — jamais FinLedger                                          |
+| Orchestrator     | `WorkflowPort`            | Temporal (`PaymentCaptureWorkflow`, `RefundWorkflow`)                                                                          |
+| Orchestrator     | `RiskPort`                | REST interne / adapter in-memory pour tests                                                                                    |
+| Orchestrator     | `MerchantPort`            | REST interne vers `merchant-service` (`merchantId → assignedRuleSetKey`)                                                       |
 | Merchant Service | `AccountProvisioningPort` | client REST FinLedger **séparé** — à l'activation : créer tenant `SUB_MERCHANT` + wallets (2ᵉ ACL ; aligné sandbox aggregator) |
-| Rail Adapter | `RailProviderPort` | PSP sandbox MmSandbox uniquement — **zéro** dépendance FinLedger |
-| Reconciliation | `StatementSourcePort` | fichiers CSV sandbox, ensuite SFTP/API |
-| Notification | `WebhookTransportPort` | HTTP signé HMAC |
-| Reporting | `ProjectionStorePort` | PostgreSQL puis Redis cache-aside |
+| Rail Adapter     | `RailProviderPort`        | PSP sandbox MmSandbox uniquement — **zéro** dépendance FinLedger                                                               |
+| Reconciliation   | `StatementSourcePort`     | fichiers CSV sandbox, ensuite SFTP/API                                                                                         |
+| Notification     | `WebhookTransportPort`    | HTTP signé HMAC                                                                                                                |
+| Reporting        | `ProjectionStorePort`     | PostgreSQL puis Redis cache-aside                                                                                              |
 
 ### 2.3 Pourquoi pas un « shared domain »
 
@@ -240,12 +241,12 @@ Chaque service possède une base PostgreSQL ou un schéma strictement isolé. Un
 
 ### 3.3 CAP, PACELC, ACID et BASE
 
-| Élément | Choix pendant partition (CAP) | Choix hors partition (PACELC) |
-| --- | --- | --- |
-| FinLedger | refuse une écriture si ses préconditions ne sont pas vérifiables | accepte la latence d'une transaction cohérente |
-| Payment Orchestrator | persiste localement l'état atteint; ne conclut jamais à la place du rail | privilégie workflow durable plutôt qu'appel synchrone long |
-| Rail Adapter | conserve l'ambiguïté et interroge/réconcilie | préfère idempotence et confirmation à une réponse optimiste |
-| Reporting/BFF lecture | sert dernière vue disponible avec staleness | privilégie faible latence/cache, jamais vérité financière |
+| Élément               | Choix pendant partition (CAP)                                            | Choix hors partition (PACELC)                               |
+| --------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| FinLedger             | refuse une écriture si ses préconditions ne sont pas vérifiables         | accepte la latence d'une transaction cohérente              |
+| Payment Orchestrator  | persiste localement l'état atteint; ne conclut jamais à la place du rail | privilégie workflow durable plutôt qu'appel synchrone long  |
+| Rail Adapter          | conserve l'ambiguïté et interroge/réconcilie                             | préfère idempotence et confirmation à une réponse optimiste |
+| Reporting/BFF lecture | sert dernière vue disponible avec staleness                              | privilégie faible latence/cache, jamais vérité financière   |
 
 ---
 
@@ -276,16 +277,16 @@ EmitPaymentSettled
 DeliverWebhook (async, non bloquant — agrégat WebhookDelivery)
 ```
 
-| Échec | Décision | Compensation |
-| --- | --- | --- |
-| Risk rejeté / review négative | terminal avant tout appel rail | aucune |
-| Rail rejeté net (avant tout FinLedger) | `FAILED_FINAL` | aucune — FinLedger jamais touché |
-| Rail timeout / ambigu **avant** acceptation | `RECONCILIATION_REQUIRED` | poll/statement ; si exécuté tardivement → initiate+settle ; sinon `FAILED_FINAL` |
-| `initiate` échoue **après** acceptation PSP | retry idempotent, jamais abandonné | alerte si bloqué au-delà d'un seuil (argent PSP sans PENDING = incident) |
-| Timeout webhook **après** PENDING | `RECONCILIATION_REQUIRED` | preuve → settle ; ou Break `request reversal` → `FAILED_FINAL` |
-| `.../settle` échoue après preuve finale PSP | retry idempotent, jamais abandonné | alerte si bloqué |
-| `.../splits` échoue après `SETTLED` | retry idempotent + alerte / Break ops si SLA dépassé | `Payment` reste `SETTLED` (pas de régression d'état) |
-| Notification échoue | n'affecte pas le paiement | retry/DLQ delivery |
+| Échec                                       | Décision                                             | Compensation                                                                     |
+| ------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Risk rejeté / review négative               | terminal avant tout appel rail                       | aucune                                                                           |
+| Rail rejeté net (avant tout FinLedger)      | `FAILED_FINAL`                                       | aucune — FinLedger jamais touché                                                 |
+| Rail timeout / ambigu **avant** acceptation | `RECONCILIATION_REQUIRED`                            | poll/statement ; si exécuté tardivement → initiate+settle ; sinon `FAILED_FINAL` |
+| `initiate` échoue **après** acceptation PSP | retry idempotent, jamais abandonné                   | alerte si bloqué au-delà d'un seuil (argent PSP sans PENDING = incident)         |
+| Timeout webhook **après** PENDING           | `RECONCILIATION_REQUIRED`                            | preuve → settle ; ou Break `request reversal` → `FAILED_FINAL`                   |
+| `.../settle` échoue après preuve finale PSP | retry idempotent, jamais abandonné                   | alerte si bloqué                                                                 |
+| `.../splits` échoue après `SETTLED`         | retry idempotent + alerte / Break ops si SLA dépassé | `Payment` reste `SETTLED` (pas de régression d'état)                             |
+| Notification échoue                         | n'affecte pas le paiement                            | retry/DLQ delivery                                                               |
 
 ### 4.2 Orchestration vs choreography
 
@@ -320,8 +321,6 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 ## 5. Idempotence, outbox, inbox et CDC
 
-*(inchangé vs v1 — voir détails d'implémentation : idempotency_record, inbox par consumer, outbox transactionnel, CDC via Debezium sur l'outbox FinLedger)*
-
 - Idempotence API sur toute commande mutante (`Idempotency-Key` + hash canonique, écrit dans la même transaction locale que la mutation).
 - Inbox avant action pour tout consumer Kafka/RabbitMQ.
 - Outbox transactionnel, jamais de dual-write.
@@ -333,12 +332,12 @@ Remboursement **partiel supporté nativement** dès v1 (FinLedger applique la po
 
 ### 6.1 Topics de départ (corrigé — topics fantômes supprimés)
 
-| Topic | Producteur | Clé | Consumers | Retention |
-| --- | --- | --- | --- | --- |
-| `payment.lifecycle.v1` | Orchestrator | `paymentId` | Reporting, Notification, Reconciliation | 30 jours |
-| `ledger.journal-entry.v1` | FinLedger CDC | `journalEntryId` | Reporting, Reconciliation | 90 jours |
-| `rail.operation.v1` | Rail Adapter | `railOperationId` | Orchestrator, Reconciliation | 30 jours |
-| `*.retry.*` / `{topic}.dlq` | consumers → DLQ; ops replay | clé d'origine | Reporting replay + runbook; `*.retry.*` deferred | politique dédiée |
+| Topic                       | Producteur                  | Clé               | Consumers                                        | Retention        |
+| --------------------------- | --------------------------- | ----------------- | ------------------------------------------------ | ---------------- |
+| `payment.lifecycle.v1`      | Orchestrator                | `paymentId`       | Reporting, Notification, Reconciliation          | 30 jours         |
+| `ledger.journal-entry.v1`   | FinLedger CDC               | `journalEntryId`  | Reporting, Reconciliation                        | 90 jours         |
+| `rail.operation.v1`         | Rail Adapter                | `railOperationId` | Orchestrator, Reconciliation                     | 30 jours         |
+| `*.retry.*` / `{topic}.dlq` | consumers → DLQ; ops replay | clé d'origine     | Reporting replay + runbook; `*.retry.*` deferred | politique dédiée |
 
 **Suppressions vs v1** : `tenant.events.v1` (aucun "control plane" PayHub réel — la création de tenant reste une opération `platform:admin` sur FinLedger, consommée via API, pas via topic) et `ledger.account-impact.v1` (Reporting dérive l'impact compte directement des postings de `ledger.journal-entry.v1`, sans second topic dédié tant que le besoin n'est pas prouvé — §0.2.8).
 
@@ -366,11 +365,11 @@ Budget de latence (sync `POST /payments`) : Gateway + BFF + Orchestrator + Risk 
 
 **In-app avant mesh** (DS-015, décision §19) : Resilience4j sur `payment-orchestrator` par dépendance outbound (`rail`, `finledger`, `risk`) :
 
-| Dépendance | Pool HTTP dédié | Bulkhead (max concurrent) | TimeLimiter (défaut) | CircuitBreaker | Retry |
-| --- | --- | --- | --- | --- | --- |
-| `rail` | `maxConnTotal=4` | 2 | 3s | failure-rate 50% / slow-call 2s | **non** (évite double retry avec Temporal ; timeout → `AMBIGUOUS`) |
-| `finledger` | `maxConnTotal=16` | 8 | 5s | idem | connexion / 5xx classifiés `retryable` seulement (max 2) |
-| `risk` | `maxConnTotal=8` | 4 | 1s | idem | max 2 sur erreurs retryable |
+| Dépendance  | Pool HTTP dédié   | Bulkhead (max concurrent) | TimeLimiter (défaut) | CircuitBreaker                  | Retry                                                              |
+| ----------- | ----------------- | ------------------------- | -------------------- | ------------------------------- | ------------------------------------------------------------------ |
+| `rail`      | `maxConnTotal=4`  | 2                         | 3s                   | failure-rate 50% / slow-call 2s | **non** (évite double retry avec Temporal ; timeout → `AMBIGUOUS`) |
+| `finledger` | `maxConnTotal=16` | 8                         | 5s                   | idem                            | connexion / 5xx classifiés `retryable` seulement (max 2)           |
+| `risk`      | `maxConnTotal=8`  | 4                         | 1s                   | idem                            | max 2 sur erreurs retryable                                        |
 
 Shedding / backpressure edge : rate-limit Gateway (DS-011). Bulkhead plein / CB open → fail-fast `retryable` (ledger/risk) ou rail `AMBIGUOUS` — jamais `FAILED_FINAL` sur timeout rail. Pas d'Istio/Linkerd en v1.
 
@@ -379,8 +378,6 @@ Exit DS-015 : un rail lent **n'épuise pas** le pool FinLedger (pools + bulkhead
 ---
 
 ## 8. Cache, projections et expérience de lecture
-
-*(inchangé vs v1)*
 
 ---
 
@@ -416,8 +413,6 @@ PayHub Reconciliation importe un statement rail idempotent, corrèle référence
 
 ## 10. Edge, sécurité et multi-tenancy
 
-*(endpoints Ops BFF étendus ; IdP local = Zitadel — ADR-007)*
-
 - Issuer OIDC local : Zitadel (`http://localhost:8090` en profil `identity` / DevContainer) ;
   datastore IdP **défaut lab** = Postgres dédié (`postgres-zitadel`) ; Cockroach single-node
   reste un profil optionnel `identity-crdb` si RAM dispo (**uniquement** Zitadel, jamais une
@@ -429,11 +424,10 @@ PayHub Reconciliation importe un statement rail idempotent, corrèle référence
 - `GET/POST /ops/reconciliation/...` → proxy thin vers `reconciliation-service`
 - Endpoints breaks/DLQ déjà prévus, inchangés
 - FinLedger conserve son propre issuer (`internal` sandbox) — distinct du JWT edge PayHub.
+
 ---
 
 ## 11–16. Service discovery/K8s, Observabilité, HA/DR, Tests, CI/CD, Documentation
-
-*(inchangés vs v1 dans leur substance — voir la version précédente de ce document pour le détail complet de chaque section ; seules les références de service/topic ci-dessus ont changé)*
 
 Ajout : `docs/OPEN_QUESTIONS.md` référencé depuis §16 comme registre vivant des points non tranchés (ex. self-service refund côté Merchant BFF, usage futur de `SUSPENSE_HOLD` pour les payouts, PRO_RATA vs NO_REVERSE si le produit évolue).
 
@@ -445,41 +439,41 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 
 ## 17. Roadmap de développement (renuméroté)
 
-1. **DS-001 — Cadrage DDD :** event storming, context map (incl. Merchant), langage ubiquitaire, ownership, ADR CAP/PACELC. *Exit : context map + ADR relus et approuvés, aucun BC sans propriétaire.*
-2. **DS-002 — Fondation dépôt :** skeleton hexagonal des 10 services, ArchUnit, Compose, CI, conventions contrats. *Exit : `./mvnw test` vert sur les 10 modules, ArchUnit actif, Compose démarre.*
-3. **DS-003 — Intégration FinLedger :** image versionnée, `LedgerPort`/`FinLedgerClient` Orchestrator (smoke `rails/payments` sandbox ou endpoint de connectivité documenté — pas un contournement métier via `journal-entries`), propagation tenant/trace/idempotence. *Exit : un appel `LedgerPort` rejoué avec la même `Idempotency-Key` ne crée aucun second effet.*
-4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning tenant FinLedger `SUB_MERCHANT` + wallets à l'activation, endpoints Ops BFF approve/reject. *Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un `finLedgerTenantId` `SUB_MERCHANT` et des wallets référencés.*
-5. **DS-005 — Backbone events :** outbox FinLedger → Debezium → Kafka, Schema Registry, AsyncAPI, premier consumer inbox. *Exit : replay Kafka/CDC ne double aucun effet fonctionnel.*
-6. **DS-006 — Paiement happy path (sans rail réel) :** `Payment` aggregate, idempotence API, Temporal, réponse sync = `RISK_APPROVED` ; RailPort stub/in-memory. *Exit : `CREATED` → `RISK_APPROVED` + workflow démarré ; pas d'exigence `SETTLED` (c'est DS-008).*
-7. **DS-007 — Garanties de traitement :** inbox/outbox standardisées, retries, side effects idempotents. *Exit : rejouer un message dupliqué ne produit aucun second effet.*
-8. **DS-008 — Rail et compensation paiement :** ordre PSP→initiate→settle, MmSandbox, timeout ambigu avant/après PENDING. *Exit : (a) rejet net PSP → `FAILED_FINAL` sans appel FinLedger ; (b) timeout simulé → `RECONCILIATION_REQUIRED` jamais `SETTLED` prématuré ; (c) happy path sandbox → `SETTLED`.*
-9. **DS-009 — Refund :** `RefundWorkflow`, `POST .../refunds`, policy `NO_REVERSE` provisionnée. *Exit : un remboursement partiel respecte la policy FinLedger sans arithmétique côté PayHub.*
-10. **DS-010 — Reconciliation :** import statement, breaks, lock/leadership, console Ops minimale. *Exit : un `Break` créé par divergence est résolu par une commande auditée, jamais une correction SQL directe.*
-11. **DS-011 — Edge :** Gateway, OIDC/JWT, isolation tenant, rate limiting, Merchant/Ops BFF. *Exit : un appel sans JWT valide est rejeté avant d'atteindre un service métier.*
-12. **DS-012 — Tracing :** OTel de bout en bout. *Exit : une trace unique traverse Gateway → Orchestrator → FinLedger → Rail Adapter → Kafka → consumer.*
-13. **DS-013 — CQRS :** Reporting projection, staleness, Redis cache-aside. *Exit : une lecture Reporting expose son `asOf`/lag, jamais présentée comme à jour par défaut.*
-14. **DS-014 — Notifications :** webhooks signés, retries, DLQ; POC RabbitMQ documenté. *Exit : une livraison webhook échouée finit en DLQ observable, jamais perdue silencieusement.*
-15. **DS-015 — Résilience :** budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure. *Exit : un rail lent n'épuise pas le pool de connexions FinLedger (bulkhead prouvé sous charge).*
-16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. *Exit : un message poison est isolé sans bloquer les autres partitions.*
+1. **DS-001 — Cadrage DDD :** event storming, context map (incl. Merchant), langage ubiquitaire, ownership, ADR CAP/PACELC. _Exit : context map + ADR relus et approuvés, aucun BC sans propriétaire._
+2. **DS-002 — Fondation dépôt :** skeleton hexagonal des 10 services, ArchUnit, Compose, CI, conventions contrats. _Exit : `./mvnw test` vert sur les 10 modules, ArchUnit actif, Compose démarre._
+3. **DS-003 — Intégration FinLedger :** image versionnée, `LedgerPort`/`FinLedgerClient` Orchestrator (smoke `rails/payments` sandbox ou endpoint de connectivité documenté — pas un contournement métier via `journal-entries`), propagation tenant/trace/idempotence. _Exit : un appel `LedgerPort` rejoué avec la même `Idempotency-Key` ne crée aucun second effet._
+4. **DS-004 — Merchant service :** agrégat `Merchant`, provisioning tenant FinLedger `SUB_MERCHANT` + wallets à l'activation, endpoints Ops BFF approve/reject. _Exit : un marchand `PENDING_REVIEW → ACTIVE` obtient un `finLedgerTenantId` `SUB_MERCHANT` et des wallets référencés._
+5. **DS-005 — Backbone events :** outbox FinLedger → Debezium → Kafka, Schema Registry, AsyncAPI, premier consumer inbox. _Exit : replay Kafka/CDC ne double aucun effet fonctionnel._
+6. **DS-006 — Paiement happy path (sans rail réel) :** `Payment` aggregate, idempotence API, Temporal, réponse sync = `RISK_APPROVED` ; RailPort stub/in-memory. _Exit : `CREATED` → `RISK_APPROVED` + workflow démarré ; pas d'exigence `SETTLED` (c'est DS-008)._
+7. **DS-007 — Garanties de traitement :** inbox/outbox standardisées, retries, side effects idempotents. _Exit : rejouer un message dupliqué ne produit aucun second effet._
+8. **DS-008 — Rail et compensation paiement :** ordre PSP→initiate→settle, MmSandbox, timeout ambigu avant/après PENDING. _Exit : (a) rejet net PSP → `FAILED_FINAL` sans appel FinLedger ; (b) timeout simulé → `RECONCILIATION_REQUIRED` jamais `SETTLED` prématuré ; (c) happy path sandbox → `SETTLED`._
+9. **DS-009 — Refund :** `RefundWorkflow`, `POST .../refunds`, policy `NO_REVERSE` provisionnée. _Exit : un remboursement partiel respecte la policy FinLedger sans arithmétique côté PayHub._
+10. **DS-010 — Reconciliation :** import statement, breaks, lock/leadership, console Ops minimale. _Exit : un `Break` créé par divergence est résolu par une commande auditée, jamais une correction SQL directe._
+11. **DS-011 — Edge :** Gateway, OIDC/JWT, isolation tenant, rate limiting, Merchant/Ops BFF. _Exit : un appel sans JWT valide est rejeté avant d'atteindre un service métier._
+12. **DS-012 — Tracing :** OTel de bout en bout. _Exit : une trace unique traverse Gateway → Orchestrator → FinLedger → Rail Adapter → Kafka → consumer._
+13. **DS-013 — CQRS :** Reporting projection, staleness, Redis cache-aside. _Exit : une lecture Reporting expose son `asOf`/lag, jamais présentée comme à jour par défaut._
+14. **DS-014 — Notifications :** webhooks signés, retries, DLQ; POC RabbitMQ documenté. _Exit : une livraison webhook échouée finit en DLQ observable, jamais perdue silencieusement._
+15. **DS-015 — Résilience :** budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure. _Exit : un rail lent n'épuise pas le pool de connexions FinLedger (bulkhead prouvé sous charge)._
+16. **DS-016 — Event operations :** `{topic}.dlq` isolation, replay tool, poison runbook (quotas/rebalances documented). Dedicated `*.retry.*` deferred. _Exit : un message poison est isolé sans bloquer les autres partitions._
 17. **DS-017 — Chaos/load :** Toxiproxy cut on Orchestrator→FinLedger, capacity note in
-    [`platform/chaos/`](../platform/chaos/README.md). *Exit : aucun doublon financier détecté après une expérience de chaos codifiée.*
+    [`platform/chaos/`](../platform/chaos/README.md). _Exit : aucun doublon financier détecté après une expérience de chaos codifiée._
 18. **DS-018 — Container registry & release workflow :** `release.yml` réel — build multi-arch
     (`linux/amd64`, `linux/arm64`) on push to `main` / version tags → push **GHCR**
     `ghcr.io/pauluno777/payhub-<service>:<semver>` (see [ADR-008](adr/DS-ADR-008-ghcr-and-kind.md)).
     Image contract: `:local` for laptop builds, semver for releases; never `:latest` alone.
     Auth via `GITHUB_TOKEN` only (`packages: write`) — no Docker Hub token for PayHub images.
-    FinLedger stays on its pinned Docker Hub image (external). *Exit : un tag `v0.1.0`
+    FinLedger stays on its pinned Docker Hub image (external). _Exit : un tag `v0.1.0`
     déclenche un build+push visible sur GHCR pour au moins un service, vérifiable par
-    `docker pull` hors du repo.*
+    `docker pull` hors du repo._
 19. **DS-019 — Kind Temporal failover (exit-focused) :** **kind single-node** (ADR-008)
-    + kustomize under `platform/k8s/` : Temporal + Postgres Temporal + Postgres Orchestrator
-    + **2×** `payment-orchestrator` workers + PDB (`minAvailable: 1`). **Precondition:**
-    images GHCR (DS-018). Iteration : `kind load` ; chemin prod-like : pull GHCR.
-    **Hors scope DS-019 :** full mesh, HPA/KEDA, ArgoCD/Flux, Kafka/FinLedger/Zitadel
-    in-cluster. Diagramme lab :
-    [`docs/diagrams/k8s-namespace.mermaid`](diagrams/k8s-namespace.mermaid) (`ds019_lab`).
-    Runbook: [`docs/runbooks/kind-temporal-failover.md`](runbooks/kind-temporal-failover.md).
-    *Exit : un pod worker tué en plein saga voit son workflow repris par un autre worker Temporal.*
+    - kustomize under `platform/k8s/` : Temporal + Postgres Temporal + Postgres Orchestrator
+    - **2×** `payment-orchestrator` workers + PDB (`minAvailable: 1`). **Precondition:**
+      images GHCR (DS-018). Iteration : `kind load` ; chemin prod-like : pull GHCR.
+      **Hors scope DS-019 :** full mesh, HPA/KEDA, ArgoCD/Flux, Kafka/FinLedger/Zitadel
+      in-cluster. Diagramme lab :
+      [`docs/diagrams/k8s-namespace.mermaid`](diagrams/k8s-namespace.mermaid) (`ds019_lab`).
+      Runbook: [`docs/runbooks/kind-temporal-failover.md`](runbooks/kind-temporal-failover.md).
+      _Exit : un pod worker tué en plein saga voit son workflow repris par un autre worker Temporal._
 20. **DS-020 — Kind mesh (single-node) + data safety proportionnelle :** déployer le mesh
     PayHub sur **le même kind single-node** sous budget RAM laptop (Docker Desktop ~
     8 Go utile sur Mac 16 Go). **Parité DNS/images** avec Compose
@@ -492,58 +486,56 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
     (ADR-007 amendé). RabbitMQ **pas** always-on (lab DS-014 / overlay optionnel).
     Data safety **proportionnelle** : restore/PITR/CDC recovery **sans** exiger HA
     multi-node sur le laptop ; HA multi-AZ reste hors lab permanent. Empreinte cible
-    ~10–11.5 Go à chaud = tension assumée ; Plan B cloud = OPEN_QUESTIONS Q18.
+    ~10–11.5 Go à chaud = tension assumée ; Plan B cloud = OPEN*QUESTIONS Q18.
     Diagramme cible : `ds020_mesh_target` dans
     [`docs/diagrams/k8s-namespace.mermaid`](diagrams/k8s-namespace.mermaid).
-    *Exit : (a) mesh boot sous budget documenté sans OOMKiller récurrent ; (b) une
+    \_Exit : (a) mesh boot sous budget documenté sans OOMKiller récurrent ; (b) une
     restauration vérifie données + reprise CDC sans divergence (critère data-safety
     proportionnel).*
 21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks ; Prometheus/Grafana sur kind
     single-node. **ArgoCD/Flux (GitOps)** n’est pas day-1 de DS-019 — ticket/sous-clause
-    ultérieur après les alertes utiles. *Exit : chaque alerte pointe vers un runbook
-    testé au moins une fois.*
-22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
-23. **DS-023 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
+    ultérieur après les alertes utiles. _Exit : chaque alerte pointe vers un runbook
+    testé au moins une fois._
+22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. _Exit : une bascule de leader observée et documentée, sans consensus fait-maison._
+23. **DS-023 — DR game day :** perte simulée de zone, RPO/RTO mesurés. _Exit : RPO/RTO réels rapportés avec écarts documentés._
     **Ensuite (éphémère) :** lab multi-node kind ou kubeadm (anti-affinity / scheduling)
     — créé, validé, détruit ; ou fusionné avec le lab consensus DS-022. Pas de cluster
     multi-node permanent sur le laptop.
-24. **DS-024 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
-25. **DS-025 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
+24. **DS-024 — Mesh POC :** seulement après ADR bénéfice/coût. _Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée._
+25. **DS-025 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. _Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix._
 
 ---
 
 ## 18. Inspirations et positionnement
 
-*(inchangé vs v1)*
-
 ---
 
 ## 19. Décisions structurantes — ne pas dévier sans ADR
 
-| Décision | Alternative écartée | Raison |
-| --- | --- | --- |
-| PayHub démarre en 10 microservices, pas en monolithe modulaire | Monolithe d'abord, extraction par preuve | Objectif d'apprentissage prioritaire : les frontières inter-services sont le sujet du projet, pas un risque à différer |
-| Merchant est un bounded context dédié (`merchant-service`) | Données seedées statiques, pas de service | Onboarding/approbation marchand est une action d'opérateur réelle (Ops BFF) ; Angular hors v1 (Q12) |
-| Merchant actif → tenant FinLedger `SUB_MERCHANT` + wallets | Compte seul sous le tenant EcoPay | Aligné sandbox FinLedger `aggregator` ; JWT `tenant_id` / isolation cohérents (Q14) |
-| Conversation PSP = Rail Adapter only ; appels FinLedger rails/settle/splits/refunds = Orchestrator `LedgerPort` only | Rail Adapter appelle aussi FinLedger ; ou webhook PSP → HMAC FinLedger | Sépare anti-corruption PSP vs ledger ; HMAC FinLedger ≠ contrat mobile money ; `ManualRailAdapter` ne parle à aucun PSP |
-| Ordre paiement : PSP d'abord, puis `initiate` (PENDING), puis `settle` | `initiate` avant le PSP (PENDING orphelin si rejet net) | Un rejet immédiat n'a rien à compenser ; pas besoin d'inventer un `cancel` FinLedger (Q9) ; PENDING seulement après acceptation traitement |
-| Pas de hold séparé (`SUSPENSE_HOLD`) pour le paiement entrant v1 | Hold explicite en plus du PENDING rail | Le PENDING post-acceptation PSP suffit ; `SUSPENSE_HOLD` réservé à d'autres besoins (Q7) |
-| Deux ACL FinLedger distinctes (Orchestrator paiement ; Merchant provisioning) | Un seul client partagé cross-services | Responsabilités différentes ; pas de shared domain ledger |
-| Split : Orchestrator sélectionne un `ruleSetKey`, FinLedger calcule (`/splits`) | Calcul du split (95/3/2, arrondi) côté PayHub | FinLedger possède déjà `DeclarativeSplitPlanResolver` + `SplitPlanEvaluator` (HALF_EVEN) ; dupliquer l'arithmétique financière viole §0.1 |
-| Refund : appel natif `POST .../refunds`, policy tenant FinLedger (`feeReversalPolicy`) | Réimplémenter NO_REVERSE/PRO_RATA côté PayHub | FinLedger (ADR-005) supporte déjà les deux policies nativement, configurables sans code PayHub |
-| Ordre refund : rail d'abord, ledger ensuite | Ledger d'abord | Évite un chemin de compensation "reverse-du-refund" ; retry idempotent illimité en cas d'échec `.../refunds` post-confirmation rail est plus simple |
-| `tenant.events.v1` et `ledger.account-impact.v1` supprimés du catalogue v1 | Les garder avec un producteur à définir plus tard | Aucun service PayHub réel ne les produit ; les réintroduire quand un vrai besoin/propriétaire existe (§0.2.8) |
-| FinLedger est unique vérité monétaire | Balance miroir dans Orchestrator/Redis | Audit et cohérence financière |
-| Temporal orchestre paiement/refund | Choreography intégrale | Timeouts et compensations explicites |
-| Outbox + CDC + inbox | Dual write, consumer naïf | Perte/doublon contrôlés |
-| Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
-| Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
-| IdP local = Zitadel (Go) ; datastore **défaut lab** = Postgres dédié ; Cockroach = profil optionnel | Keycloak ; Cockroach obligatoire sur laptop 16 Go ; Cockroach comme DB métier PayHub | RAM kind/Compose (ADR-007 amendé) ; Postgres reste la DB de chaque service PayHub |
-| Images PayHub → **GHCR** (`ghcr.io/pauluno777/payhub-*`) ; release via GHA `GITHUB_TOKEN` | Docker Hub pour les images PayHub | Zéro secret registry dédié ; pas de rate-limit d'apprentissage ; FinLedger reste sur Docker Hub (externe) — ADR-008 |
-| Cluster local = **kind single-node** (défaut jusqu’à DS-021) ; multi-node = lab éphémère post-DS-023 / DS-022 | k3d défaut ; multi-node kind permanent sur laptop | Control plane upstream (etcd) sans cannibaliser la RAM des services — ADR-008 amendé |
-| **Parité Compose ↔ kind** : mêmes noms DNS + mêmes images ; ConfigMap = projection des hostnames `*-compose.yml` | Noms kind inventés ; images/rebuild ad hoc | ADR-003 amendé ; catalogue [`platform/ports.md`](../platform/ports.md) |
-| Registry + `release.yml` = ticket dédié (DS-018) avant K8s (DS-019) | Plier publish + kind + failover Temporal dans DS-019 | Une PR = une préoccupation ; critère de sortie de registry vérifiable séparément |
-| DS-019 = Temporal failover only ; mesh+RAM = DS-020 ; GitOps Argo ≠ day-1 DS-019 | Full mesh + HPA + Argo dans DS-019 | Exit Temporal prouvable sans OOM ; budget RAM documenté avant d’empiler le mesh |
+| Décision                                                                                                             | Alternative écartée                                                                  | Raison                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PayHub démarre en 10 microservices, pas en monolithe modulaire                                                       | Monolithe d'abord, extraction par preuve                                             | Objectif d'apprentissage prioritaire : les frontières inter-services sont le sujet du projet, pas un risque à différer                              |
+| Merchant est un bounded context dédié (`merchant-service`)                                                           | Données seedées statiques, pas de service                                            | Onboarding/approbation marchand est une action d'opérateur réelle (Ops BFF) ; Angular hors v1 (Q12)                                                 |
+| Merchant actif → tenant FinLedger `SUB_MERCHANT` + wallets                                                           | Compte seul sous le tenant EcoPay                                                    | Aligné sandbox FinLedger `aggregator` ; JWT `tenant_id` / isolation cohérents (Q14)                                                                 |
+| Conversation PSP = Rail Adapter only ; appels FinLedger rails/settle/splits/refunds = Orchestrator `LedgerPort` only | Rail Adapter appelle aussi FinLedger ; ou webhook PSP → HMAC FinLedger               | Sépare anti-corruption PSP vs ledger ; HMAC FinLedger ≠ contrat mobile money ; `ManualRailAdapter` ne parle à aucun PSP                             |
+| Ordre paiement : PSP d'abord, puis `initiate` (PENDING), puis `settle`                                               | `initiate` avant le PSP (PENDING orphelin si rejet net)                              | Un rejet immédiat n'a rien à compenser ; pas besoin d'inventer un `cancel` FinLedger (Q9) ; PENDING seulement après acceptation traitement          |
+| Pas de hold séparé (`SUSPENSE_HOLD`) pour le paiement entrant v1                                                     | Hold explicite en plus du PENDING rail                                               | Le PENDING post-acceptation PSP suffit ; `SUSPENSE_HOLD` réservé à d'autres besoins (Q7)                                                            |
+| Deux ACL FinLedger distinctes (Orchestrator paiement ; Merchant provisioning)                                        | Un seul client partagé cross-services                                                | Responsabilités différentes ; pas de shared domain ledger                                                                                           |
+| Split : Orchestrator sélectionne un `ruleSetKey`, FinLedger calcule (`/splits`)                                      | Calcul du split (95/3/2, arrondi) côté PayHub                                        | FinLedger possède déjà `DeclarativeSplitPlanResolver` + `SplitPlanEvaluator` (HALF_EVEN) ; dupliquer l'arithmétique financière viole §0.1           |
+| Refund : appel natif `POST .../refunds`, policy tenant FinLedger (`feeReversalPolicy`)                               | Réimplémenter NO_REVERSE/PRO_RATA côté PayHub                                        | FinLedger (ADR-005) supporte déjà les deux policies nativement, configurables sans code PayHub                                                      |
+| Ordre refund : rail d'abord, ledger ensuite                                                                          | Ledger d'abord                                                                       | Évite un chemin de compensation "reverse-du-refund" ; retry idempotent illimité en cas d'échec `.../refunds` post-confirmation rail est plus simple |
+| `tenant.events.v1` et `ledger.account-impact.v1` supprimés du catalogue v1                                           | Les garder avec un producteur à définir plus tard                                    | Aucun service PayHub réel ne les produit ; les réintroduire quand un vrai besoin/propriétaire existe (§0.2.8)                                       |
+| FinLedger est unique vérité monétaire                                                                                | Balance miroir dans Orchestrator/Redis                                               | Audit et cohérence financière                                                                                                                       |
+| Temporal orchestre paiement/refund                                                                                   | Choreography intégrale                                                               | Timeouts et compensations explicites                                                                                                                |
+| Outbox + CDC + inbox                                                                                                 | Dual write, consumer naïf                                                            | Perte/doublon contrôlés                                                                                                                             |
+| Résilience dans le code avant mesh                                                                                   | Istio/Linkerd day 1                                                                  | Comprendre les mécanismes, éviter les retries doublés                                                                                               |
+| Consensus opéré, non implémenté                                                                                      | Écrire Raft/Paxos                                                                    | Valeur réaliste pour un architecte backend                                                                                                          |
+| IdP local = Zitadel (Go) ; datastore **défaut lab** = Postgres dédié ; Cockroach = profil optionnel                  | Keycloak ; Cockroach obligatoire sur laptop 16 Go ; Cockroach comme DB métier PayHub | RAM kind/Compose (ADR-007 amendé) ; Postgres reste la DB de chaque service PayHub                                                                   |
+| Images PayHub → **GHCR** (`ghcr.io/pauluno777/payhub-*`) ; release via GHA `GITHUB_TOKEN`                            | Docker Hub pour les images PayHub                                                    | Zéro secret registry dédié ; pas de rate-limit d'apprentissage ; FinLedger reste sur Docker Hub (externe) — ADR-008                                 |
+| Cluster local = **kind single-node** (défaut jusqu’à DS-021) ; multi-node = lab éphémère post-DS-023 / DS-022        | k3d défaut ; multi-node kind permanent sur laptop                                    | Control plane upstream (etcd) sans cannibaliser la RAM des services — ADR-008 amendé                                                                |
+| **Parité Compose ↔ kind** : mêmes noms DNS + mêmes images ; ConfigMap = projection des hostnames `*-compose.yml`     | Noms kind inventés ; images/rebuild ad hoc                                           | ADR-003 amendé ; catalogue [`platform/ports.md`](../platform/ports.md)                                                                              |
+| Registry + `release.yml` = ticket dédié (DS-018) avant K8s (DS-019)                                                  | Plier publish + kind + failover Temporal dans DS-019                                 | Une PR = une préoccupation ; critère de sortie de registry vérifiable séparément                                                                    |
+| DS-019 = Temporal failover only ; mesh+RAM = DS-020 ; GitOps Argo ≠ day-1 DS-019                                     | Full mesh + HPA + Argo dans DS-019                                                   | Exit Temporal prouvable sans OOM ; budget RAM documenté avant d’empiler le mesh                                                                     |
 
 ---
 

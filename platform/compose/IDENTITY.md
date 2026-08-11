@@ -11,11 +11,11 @@ docker compose --profile identity up -d cockroachdb zitadel
 
 Wait until Zitadel is healthy, then open:
 
-| URL | Purpose |
-|-----|---------|
-| http://localhost:8090/ui/console | Zitadel console |
-| http://localhost:8090/.well-known/openid-configuration | OIDC discovery |
-| http://localhost:8086 | Cockroach DB Console (optional) |
+| URL                                                      | Purpose                         |
+| -------------------------------------------------------- | ------------------------------- |
+| <http://localhost:8090/ui/console>                       | Zitadel console                 |
+| <http://localhost:8090/.well-known/openid-configuration> | OIDC discovery                  |
+| <http://localhost:8086>                                  | Cockroach DB Console (optional) |
 
 Default first-instance admin (local only — change if exposed):
 

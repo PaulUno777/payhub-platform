@@ -37,13 +37,13 @@ public class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
 
     @Override
     public Optional<WebhookDelivery> findById(UUID id) {
-        return jpaRepository.findById(id).map(WebhookDeliveryEntity::toDomain);
+        return jpaRepository.findById(id).map(entity -> entity.toDomain());
     }
 
     @Override
     public List<WebhookDelivery> findDue(Instant now, int limit) {
         return jpaRepository.findDue(DUE_STATUSES, now, PageRequest.of(0, limit)).stream()
-                .map(WebhookDeliveryEntity::toDomain)
+                .map(entity -> entity.toDomain())
                 .toList();
     }
 
@@ -54,7 +54,7 @@ public class JpaWebhookDeliveryRepository implements WebhookDeliveryRepository {
                         WebhookDeliveryStatus.DEAD,
                         PageRequest.of(0, limit)
                 ).stream()
-                .map(WebhookDeliveryEntity::toDomain)
+                .map(entity -> entity.toDomain())
                 .toList();
     }
 }

@@ -16,11 +16,11 @@ Services: `config-server`, `gateway`, `merchant-bff`, `merchant-service`,
 
 ### Tag contract
 
-| Source | Tags pushed |
-|--------|-------------|
-| Git tag `vX.Y.Z` (e.g. `v0.1.0`) | `:X.Y.Z` and `:latest` (semver always present — never `:latest` alone) |
-| Push to `main` (no tag) | `:sha-<7char>` and `:main` |
-| Laptop / Compose | `pauluno/payhub-<service>:local` via repo-root `docker build` (not GHCR) |
+| Source                           | Tags pushed                                                              |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| Git tag `vX.Y.Z` (e.g. `v0.1.0`) | `:X.Y.Z` and `:latest` (semver always present — never `:latest` alone)   |
+| Push to `main` (no tag)          | `:sha-<7char>` and `:main`                                               |
+| Laptop / Compose                 | `pauluno/payhub-<service>:local` via repo-root `docker build` (not GHCR) |
 
 Auth in Actions: `GITHUB_TOKEN` with `packages: write` only — no Docker Hub token for PayHub.
 
@@ -35,8 +35,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-3. Wait for the **Release** workflow on that tag (test → multi-arch publish → GitHub Release).
-4. Packages appear under the repo **Packages** tab (`payhub-<service>`).
+1. Wait for the **Release** workflow on that tag (test → multi-arch publish → GitHub Release).
+2. Packages appear under the repo **Packages** tab (`payhub-<service>`).
 
 ### Package visibility (anonymous pull)
 

@@ -4,8 +4,6 @@ spring:
   cloud:
     config:
       enabled: false
-      import-check:
-        enabled: false
 management:
   tracing:
     sampling:
