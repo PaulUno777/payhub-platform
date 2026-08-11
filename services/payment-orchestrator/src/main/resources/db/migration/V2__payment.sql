@@ -3,7 +3,7 @@ CREATE TABLE payment (
     merchant_id UUID NOT NULL,
     tenant_id UUID NOT NULL,
     amount NUMERIC(19, 4) NOT NULL,
-    currency CHAR(3) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
     client_reference VARCHAR(255) NOT NULL,
     status VARCHAR(32) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,

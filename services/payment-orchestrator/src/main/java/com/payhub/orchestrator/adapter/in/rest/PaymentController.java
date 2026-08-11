@@ -16,6 +16,7 @@ import com.payhub.orchestrator.application.dto.PaymentView;
 import com.payhub.orchestrator.application.dto.RequestRefundCommand;
 import com.payhub.orchestrator.application.dto.ResolveReconciliationCommand;
 import com.payhub.orchestrator.application.dto.SubmitPaymentCommand;
+import com.payhub.orchestrator.application.port.in.ContinueCaptureUseCase;
 import com.payhub.orchestrator.application.port.in.GetPaymentUseCase;
 import com.payhub.orchestrator.application.port.in.RequestRefundUseCase;
 import com.payhub.orchestrator.application.port.in.ResolveReconciliationUseCase;
@@ -33,17 +34,20 @@ public class PaymentController {
     private final GetPaymentUseCase getPaymentUseCase;
     private final RequestRefundUseCase requestRefundUseCase;
     private final ResolveReconciliationUseCase resolveReconciliationUseCase;
+    private final ContinueCaptureUseCase continueCaptureUseCase;
 
     public PaymentController(
             SubmitPaymentUseCase submitPaymentUseCase,
             GetPaymentUseCase getPaymentUseCase,
             RequestRefundUseCase requestRefundUseCase,
-            ResolveReconciliationUseCase resolveReconciliationUseCase
+            ResolveReconciliationUseCase resolveReconciliationUseCase,
+            ContinueCaptureUseCase continueCaptureUseCase
     ) {
         this.submitPaymentUseCase = submitPaymentUseCase;
         this.getPaymentUseCase = getPaymentUseCase;
         this.requestRefundUseCase = requestRefundUseCase;
         this.resolveReconciliationUseCase = resolveReconciliationUseCase;
+        this.continueCaptureUseCase = continueCaptureUseCase;
     }
 
     @PostMapping
@@ -94,6 +98,16 @@ public class PaymentController {
                 idempotencyKey
         ));
         return PaymentResponse.from(view);
+    }
+
+    /**
+     * Resume a capture workflow parked at {@code Workflow.await} (e.g. after RISK_REVIEW).
+     * Used by the DS-019 kind Temporal failover runbook.
+     */
+    @PostMapping("/{id}/continue-capture")
+    public ResponseEntity<Void> continueCapture(@PathVariable UUID id) {
+        continueCaptureUseCase.execute(id);
+        return ResponseEntity.accepted().build();
     }
 
     public record SubmitRequest(

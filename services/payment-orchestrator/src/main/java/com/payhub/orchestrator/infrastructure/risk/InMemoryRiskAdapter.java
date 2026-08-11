@@ -11,7 +11,14 @@ import com.payhub.orchestrator.application.port.out.RiskPort;
 @ConditionalOnProperty(prefix = "payhub.risk", name = "mode", havingValue = "in-memory", matchIfMissing = true)
 public class InMemoryRiskAdapter implements RiskPort {
 
-    private final AtomicReference<RiskDecision> decision = new AtomicReference<>(RiskDecision.APPROVED);
+    private final AtomicReference<RiskDecision> decision;
+
+    public InMemoryRiskAdapter(
+            @org.springframework.beans.factory.annotation.Value("${payhub.risk.in-memory-default-decision:APPROVED}")
+            String defaultDecision
+    ) {
+        this.decision = new AtomicReference<>(RiskDecision.valueOf(defaultDecision.trim().toUpperCase()));
+    }
 
     public void setDecision(RiskDecision decision) {
         this.decision.set(decision);

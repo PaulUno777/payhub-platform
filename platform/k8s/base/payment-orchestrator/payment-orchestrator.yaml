@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-orchestrator-config
+  labels:
+    app.kubernetes.io/name: payment-orchestrator
+data:
+  SPRING_CLOUD_CONFIG_ENABLED: "false"
+  SERVER_PORT: "8080"
+  MANAGEMENT_SERVER_PORT: "8081"
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orchestrator:5432/orchestrator
+  SPRING_DATASOURCE_USERNAME: payhub
+  SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+  SPRING_FLYWAY_ENABLED: "true"
+  PAYHUB_TEMPORAL_ENABLED: "true"
+  PAYHUB_TEMPORAL_TARGET: temporal:7233
+  PAYHUB_TEMPORAL_NAMESPACE: default
+  PAYHUB_TEMPORAL_TASK_QUEUE: payment-capture
+  PAYHUB_KAFKA_ENABLED: "false"
+  PAYHUB_OUTBOX_RELAY_ENABLED: "false"
+  PAYHUB_RISK_MODE: in-memory
+  PAYHUB_RISK_IN_MEMORY_DEFAULT_DECISION: REVIEW
+  PAYHUB_RAIL_MODE: in-memory
+  PAYHUB_RAIL_SANDBOX_MODE: ACCEPT
+  # Stub URLs: RestClient beans always wire; adapters are in-memory. No FinLedger/Zitadel in this lab.
+  PAYHUB_CLIENTS_RAIL_ADAPTER_SERVICE: http://127.0.0.1:9
+  PAYHUB_CLIENTS_RISK_SERVICE: http://127.0.0.1:9
+  PAYHUB_CLIENTS_MERCHANT_SERVICE: http://127.0.0.1:9
+  PAYHUB_FINLEDGER_BASE_URL: http://127.0.0.1:9
+  PAYHUB_SECURITY_ISSUER_URI: http://127.0.0.1:9
+  PAYHUB_SECURITY_LAB_OPEN: "true"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-orchestrator-secrets
+  labels:
+    app.kubernetes.io/name: payment-orchestrator
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_PASSWORD: payhub
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-orchestrator
+  labels:
+    app.kubernetes.io/name: payment-orchestrator
+spec:
+  selector:
+    app.kubernetes.io/name: payment-orchestrator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+    - name: management
+      port: 8081
+      targetPort: 8081
+      nodePort: 30081
+  type: NodePort
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-orchestrator
+  labels:
+    app.kubernetes.io/name: payment-orchestrator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment-orchestrator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-orchestrator
+  labels:
+    app.kubernetes.io/name: payment-orchestrator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payment-orchestrator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: payment-orchestrator
+    spec:
+      containers:
+        - name: payment-orchestrator
+          image: ghcr.io/pauluno777/payhub-payment-orchestrator:0.1.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: payment-orchestrator-config
+            - secretRef:
+                name: payment-orchestrator-secrets
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: management
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: management
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi

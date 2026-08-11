@@ -16,11 +16,11 @@ Services: `config-server`, `gateway`, `merchant-bff`, `merchant-service`,
 
 ### Tag contract
 
-| Source | Tags pushed |
-|--------|-------------|
-| Git tag `vX.Y.Z` (e.g. `v0.1.0`) | `:X.Y.Z` and `:latest` (semver always present — never `:latest` alone) |
-| Push to `main` (no tag) | `:sha-<7char>` and `:main` |
-| Laptop / Compose | `pauluno/payhub-<service>:local` via repo-root `docker build` (not GHCR) |
+| Source                           | Tags pushed                                                              |
+| -------------------------------- | ------------------------------------------------------------------------ |
+| Git tag `vX.Y.Z` (e.g. `v0.1.0`) | `:X.Y.Z` and `:latest` (semver always present — never `:latest` alone)   |
+| Push to `main` (no tag)          | `:sha-<7char>` and `:main`                                               |
+| Laptop / Compose                 | `pauluno/payhub-<service>:local` via repo-root `docker build` (not GHCR) |
 
 Auth in Actions: `GITHUB_TOKEN` with `packages: write` only — no Docker Hub token for PayHub.
 
@@ -35,8 +35,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-3. Wait for the **Release** workflow on that tag (test → multi-arch publish → GitHub Release).
-4. Packages appear under the repo **Packages** tab (`payhub-<service>`).
+1. Wait for the **Release** workflow on that tag (test → multi-arch publish → GitHub Release).
+2. Packages appear under the repo **Packages** tab (`payhub-<service>`).
 
 ### Package visibility (anonymous pull)
 
@@ -49,16 +49,15 @@ echo "$GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
 
 ## Exit criterion checklist (DS-018)
 
-- [ ] Tag `v0.1.0` pushed to `origin`
-- [ ] Actions workflow **Release** green for that tag
-- [ ] At least one image pullable outside CI:
+- [x] Tag `v0.1.0` pushed to `origin`
+- [x] Actions workflow **Release** green for that tag
+- [x] At least one image pullable outside CI:
 
 ```bash
 docker pull ghcr.io/pauluno777/payhub-payment-orchestrator:0.1.0
 ```
 
-When the pull succeeds, mark DS-018 **done** in `docs/development.md`. Do **not** start
-DS-019 (kind / GitOps) until this checklist is complete.
+DS-018 exit confirmed. Do **not** start DS-019 (kind / GitOps) until you explicitly open that ticket.
 
 ## Local build (unchanged)
 
