@@ -174,6 +174,7 @@ Les transitions sont validées par l'agrégat `Payment`. Les événements extern
 payhub-platform/
 ├── docs/
 │   ├── adr/
+│   ├── diagrams/                # topology + kind namespace phases (DS-019 / DS-020)
 │   ├── context-map.md
 │   ├── event-catalog.md
 │   ├── OPEN_QUESTIONS.md
@@ -418,7 +419,9 @@ PayHub Reconciliation importe un statement rail idempotent, corrèle référence
 *(endpoints Ops BFF étendus ; IdP local = Zitadel — ADR-007)*
 
 - Issuer OIDC local : Zitadel (`http://localhost:8090` en profil `identity` / DevContainer) ;
-  datastore IdP = CockroachDB single-node (**uniquement** Zitadel, jamais une DB métier PayHub).
+  datastore IdP **défaut lab** = Postgres dédié (`postgres-zitadel`) ; Cockroach single-node
+  reste un profil optionnel `identity-crdb` si RAM dispo (**uniquement** Zitadel, jamais une
+  DB métier PayHub) — [ADR-007](adr/DS-ADR-007-zitadel-oidc-cockroach.md) amendé.
 - JWT PayHub : `RS256`/`ES256` ; claims minimaux `sub` + `tenant_id` (UUID) pour l'isolation.
 - Gateway rejette toute requête API sans JWT valide **avant** routage vers un service métier.
 - `POST /ops/merchants/{id}/approve` / `/reject`
@@ -468,18 +471,42 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
     FinLedger stays on its pinned Docker Hub image (external). *Exit : un tag `v0.1.0`
     déclenche un build+push visible sur GHCR pour au moins un service, vérifiable par
     `docker pull` hors du repo.*
-19. **DS-019 — Kubernetes/GitOps :** Services/DNS, policies, HPA/KEDA, PDB on **kind**
-    (upstream control plane; see ADR-008). **Precondition:** PayHub service images already
-    published on GHCR (DS-018). Local iteration may use `kind load docker-image` +
-    `imagePullPolicy: IfNotPresent`; prod-like path pulls from GHCR in parallel docs — neither
-    replaces the other. v1 deliverable: kustomize under `platform/k8s/` with Temporal +
-    2× `payment-orchestrator` workers; full mesh / ArgoCD / HPA deferred.
+19. **DS-019 — Kind Temporal failover (exit-focused) :** **kind single-node** (ADR-008)
+    + kustomize under `platform/k8s/` : Temporal + Postgres Temporal + Postgres Orchestrator
+    + **2×** `payment-orchestrator` workers + PDB (`minAvailable: 1`). **Precondition:**
+    images GHCR (DS-018). Iteration : `kind load` ; chemin prod-like : pull GHCR.
+    **Hors scope DS-019 :** full mesh, HPA/KEDA, ArgoCD/Flux, Kafka/FinLedger/Zitadel
+    in-cluster. Diagramme lab :
+    [`docs/diagrams/k8s-namespace.mermaid`](diagrams/k8s-namespace.mermaid) (`ds019_lab`).
     Runbook: [`docs/runbooks/kind-temporal-failover.md`](runbooks/kind-temporal-failover.md).
-    *Exit : un pod tué en plein saga voit son workflow repris par un autre worker Temporal.*
-20. **DS-020 — Data safety :** HA DB/Kafka, PITR, restore test, migrations expand/contract. *Exit : une restauration vérifie les données et la reprise CDC sans divergence.*
-21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks. *Exit : chaque alerte pointe vers un runbook testé au moins une fois.*
+    *Exit : un pod worker tué en plein saga voit son workflow repris par un autre worker Temporal.*
+20. **DS-020 — Kind mesh (single-node) + data safety proportionnelle :** déployer le mesh
+    PayHub sur **le même kind single-node** sous budget RAM laptop (Docker Desktop ~
+    8 Go utile sur Mac 16 Go). **Parité DNS/images** avec Compose
+    ([`platform/ports.md`](../platform/ports.md), ADR-003) — `Service` names =
+    clés Compose (`postgres-rail`, pas `postgres-railadapter`). Levers documentés /
+    à appliquer dans les manifests :
+    Postgres-per-service avec conf locale (`max_connections=20`, `shared_buffers=32MB`,
+    `work_mem=4MB`) ; Kafka **KRaft 1 broker** (pas ZooKeeper) ; JVM
+    `-XX:+UseSerialGC` + `-XX:MaxRAMPercentage=75.0` ; Zitadel sur `postgres-zitadel`
+    (ADR-007 amendé). RabbitMQ **pas** always-on (lab DS-014 / overlay optionnel).
+    Data safety **proportionnelle** : restore/PITR/CDC recovery **sans** exiger HA
+    multi-node sur le laptop ; HA multi-AZ reste hors lab permanent. Empreinte cible
+    ~10–11.5 Go à chaud = tension assumée ; Plan B cloud = OPEN_QUESTIONS Q18.
+    Diagramme cible : `ds020_mesh_target` dans
+    [`docs/diagrams/k8s-namespace.mermaid`](diagrams/k8s-namespace.mermaid).
+    *Exit : (a) mesh boot sous budget documenté sans OOMKiller récurrent ; (b) une
+    restauration vérifie données + reprise CDC sans divergence (critère data-safety
+    proportionnel).*
+21. **DS-021 — SRE :** SLO/error budgets, alertes, runbooks ; Prometheus/Grafana sur kind
+    single-node. **ArgoCD/Flux (GitOps)** n’est pas day-1 de DS-019 — ticket/sous-clause
+    ultérieur après les alertes utiles. *Exit : chaque alerte pointe vers un runbook
+    testé au moins une fois.*
 22. **DS-022 — Consensus lab :** etcd/KRaft, leader failure, fencing token. *Exit : une bascule de leader observée et documentée, sans consensus fait-maison.*
 23. **DS-023 — DR game day :** perte simulée de zone, RPO/RTO mesurés. *Exit : RPO/RTO réels rapportés avec écarts documentés.*
+    **Ensuite (éphémère) :** lab multi-node kind ou kubeadm (anti-affinity / scheduling)
+    — créé, validé, détruit ; ou fusionné avec le lab consensus DS-022. Pas de cluster
+    multi-node permanent sur le laptop.
 24. **DS-024 — Mesh POC :** seulement après ADR bénéfice/coût. *Exit : comparaison chiffrée mTLS applicatif vs mesh, décision documentée.*
 25. **DS-025 — Capstone :** démo paiement + refund avec panne rail/Kafka, reprise, reconciliation, audit, revue d'architecture. *Exit : un reviewer suit une trace de bout en bout (paiement ET refund) et explique chaque choix.*
 
@@ -511,10 +538,12 @@ PayHub uses Spring Boot **Micrometer Tracing** + **OpenTelemetry** (`spring-boot
 | Outbox + CDC + inbox | Dual write, consumer naïf | Perte/doublon contrôlés |
 | Résilience dans le code avant mesh | Istio/Linkerd day 1 | Comprendre les mécanismes, éviter les retries doublés |
 | Consensus opéré, non implémenté | Écrire Raft/Paxos | Valeur réaliste pour un architecte backend |
-| IdP local = Zitadel (Go) + CockroachDB (état IdP seulement) | Keycloak sur Postgres ; Cockroach comme DB métier PayHub | Diversité d'écosystème + OIDC DevContainer ; Postgres reste la DB de chaque service PayHub (ADR-007) |
+| IdP local = Zitadel (Go) ; datastore **défaut lab** = Postgres dédié ; Cockroach = profil optionnel | Keycloak ; Cockroach obligatoire sur laptop 16 Go ; Cockroach comme DB métier PayHub | RAM kind/Compose (ADR-007 amendé) ; Postgres reste la DB de chaque service PayHub |
 | Images PayHub → **GHCR** (`ghcr.io/pauluno777/payhub-*`) ; release via GHA `GITHUB_TOKEN` | Docker Hub pour les images PayHub | Zéro secret registry dédié ; pas de rate-limit d'apprentissage ; FinLedger reste sur Docker Hub (externe) — ADR-008 |
-| Cluster local d'apprentissage = **kind** | k3d / k3s seul | Control plane Kubernetes upstream (etcd observable pour DS-022) ; `kind load` pour itérer, pull GHCR pour le chemin prod-like — ADR-008 |
+| Cluster local = **kind single-node** (défaut jusqu’à DS-021) ; multi-node = lab éphémère post-DS-023 / DS-022 | k3d défaut ; multi-node kind permanent sur laptop | Control plane upstream (etcd) sans cannibaliser la RAM des services — ADR-008 amendé |
+| **Parité Compose ↔ kind** : mêmes noms DNS + mêmes images ; ConfigMap = projection des hostnames `*-compose.yml` | Noms kind inventés ; images/rebuild ad hoc | ADR-003 amendé ; catalogue [`platform/ports.md`](../platform/ports.md) |
 | Registry + `release.yml` = ticket dédié (DS-018) avant K8s (DS-019) | Plier publish + kind + failover Temporal dans DS-019 | Une PR = une préoccupation ; critère de sortie de registry vérifiable séparément |
+| DS-019 = Temporal failover only ; mesh+RAM = DS-020 ; GitOps Argo ≠ day-1 DS-019 | Full mesh + HPA + Argo dans DS-019 | Exit Temporal prouvable sans OOM ; budget RAM documenté avant d’empiler le mesh |
 
 ---
 
