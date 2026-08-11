@@ -92,7 +92,6 @@ class PoisonMessageDoesNotBlockOtherPartitionsIT {
         registry.add("spring.data.redis.host", redis::getRedisHost);
         registry.add("spring.data.redis.port", () -> String.valueOf(redis.getRedisPort()));
         registry.add("spring.cloud.config.enabled", () -> "false");
-        registry.add("spring.cloud.config.import-check.enabled", () -> "false");
     }
 
     private static void ensureTwoPartitionTopics() throws Exception {
