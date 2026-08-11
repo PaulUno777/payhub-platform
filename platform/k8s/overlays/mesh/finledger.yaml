@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: finledger
+  labels:
+    app.kubernetes.io/name: finledger
+spec:
+  selector:
+    app.kubernetes.io/name: finledger
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: management
+      port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finledger
+  labels:
+    app.kubernetes.io/name: finledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finledger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finledger
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres-finledger -U finledger -d finledger; do sleep 2; done
+      containers:
+        - name: finledger
+          image: unoteck/finledger:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseSerialGC -XX:MaxRAMPercentage=75.0"
+            - name: SPRING_PROFILES_ACTIVE
+              value: sandbox
+            - name: FINLEDGER_ENV
+              value: local
+            - name: FINLEDGER_SECURITY_ISSUER
+              value: internal
+            - name: FINLEDGER_SANDBOX_SCENARIO
+              value: aggregator
+            - name: FINLEDGER_SANDBOX_DUMP_PATH
+              value: /workspace/config/sandbox-ready.txt
+            - name: FINLEDGER_SANDBOX_BASE_URL
+              value: http://finledger:8080
+            - name: DB_URL
+              value: jdbc:postgresql://postgres-finledger:5432/finledger
+            - name: DB_USERNAME
+              value: finledger_app
+            - name: DB_PASSWORD
+              value: finledger
+            - name: SPRING_FLYWAY_USER
+              value: finledger
+            - name: SPRING_FLYWAY_PASSWORD
+              value: finledger
+            - name: SERVER_PORT
+              value: "8080"
+            - name: MANAGEMENT_SERVER_PORT
+              value: "8081"
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 18
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: sandbox
+              mountPath: /workspace/config
+      volumes:
+        - name: sandbox
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zitadel
+  labels:
+    app.kubernetes.io/name: zitadel
+spec:
+  selector:
+    app.kubernetes.io/name: zitadel
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zitadel
+  labels:
+    app.kubernetes.io/name: zitadel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zitadel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zitadel
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - until pg_isready -h postgres-zitadel -U zitadel -d zitadel; do sleep 2; done
+      containers:
+        - name: zitadel
+          image: ghcr.io/zitadel/zitadel:v2.71.12
+          imagePullPolicy: IfNotPresent
+          args: ["start-from-init", "--masterkeyFromEnv", "--tlsMode", "disabled"]
+          env:
+            - name: ZITADEL_MASTERKEY
+              value: MasterkeyNeedsToHave32Chars!
+            - name: ZITADEL_EXTERNALDOMAIN
+              value: zitadel
+            - name: ZITADEL_EXTERNALPORT
+              value: "8080"
+            - name: ZITADEL_EXTERNALSECURE
+              value: "false"
+            - name: ZITADEL_DATABASE_POSTGRES_HOST
+              value: postgres-zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_PORT
+              value: "5432"
+            - name: ZITADEL_DATABASE_POSTGRES_DATABASE
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
+              value: disable
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
+              value: zitadel
+            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
+              value: disable
+            - name: ZITADEL_FIRSTINSTANCE_ORG_NAME
+              value: PayHub
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME
+              value: zitadel-admin
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD
+              value: PayHubAdmin1!
+            - name: ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED
+              value: "false"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /debug/healthz
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 18
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 400m
+              memory: 384Mi

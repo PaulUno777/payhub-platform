@@ -36,11 +36,13 @@ DS-019 lab already uses Compose-identical names: `payment-orchestrator`,
 
 - Kind config: [`kind/kind-config.yaml`](kind/kind-config.yaml)
 - Kustomize base: [`base/`](base/)
-- Overlays: [`overlays/ghcr`](overlays/ghcr/) (GHCR semver), [`overlays/local-load`](overlays/local-load/) (`kind load`)
+- Overlays: [`overlays/ghcr`](overlays/ghcr/) (GHCR semver), [`overlays/local-load`](overlays/local-load/) (`kind load`), [`overlays/mesh`](overlays/mesh/) (DS-020)
 - Runbook / DS-019 exit checklist: [`docs/runbooks/kind-temporal-failover.md`](../../docs/runbooks/kind-temporal-failover.md)
+- Runbook / DS-020 mesh + restore: [`docs/runbooks/kind-mesh-data-safety.md`](../../docs/runbooks/kind-mesh-data-safety.md)
 - Plan B if OOM: [`docs/OPEN_QUESTIONS.md`](../../docs/OPEN_QUESTIONS.md) Q18
 
 ```bash
 kind create cluster --name payhub --config platform/k8s/kind/kind-config.yaml
-kubectl apply -k platform/k8s/overlays/local-load   # or overlays/ghcr after a matching release tag
+kubectl apply -k platform/k8s/overlays/local-load   # DS-019 Temporal lab
+kubectl apply -k platform/k8s/overlays/mesh         # DS-020 mesh (includes base)
 ```

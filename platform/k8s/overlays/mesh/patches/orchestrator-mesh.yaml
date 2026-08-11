@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-orchestrator-config
+data:
+  PAYHUB_KAFKA_ENABLED: "true"
+  PAYHUB_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  PAYHUB_OUTBOX_RELAY_ENABLED: "true"
+  PAYHUB_FINLEDGER_BASE_URL: http://finledger:8080
+  PAYHUB_CLIENTS_RAIL_ADAPTER_SERVICE: http://rail-adapter-service:8080
+  PAYHUB_CLIENTS_RISK_SERVICE: http://risk-service:8080
+  PAYHUB_CLIENTS_MERCHANT_SERVICE: http://merchant-service:8080
+  PAYHUB_RISK_MODE: http
+  JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=75.0"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-orchestrator
+spec:
+  template:
+    spec:
+      containers:
+        - name: payment-orchestrator
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 400m
+              memory: 512Mi

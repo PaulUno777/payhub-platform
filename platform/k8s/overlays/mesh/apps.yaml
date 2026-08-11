@@ -1,0 +1,486 @@
+# PayHub apps — GHCR :0.2.0, SerialGC, compose DNS. ClusterIP only (runbook uses port-forward).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payhub-db
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_PASSWORD: payhub
+  SPRING_DATASOURCE_USERNAME: payhub
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payhub-app-common
+data:
+  SPRING_CLOUD_CONFIG_ENABLED: "false"
+  SERVER_PORT: "8080"
+  MANAGEMENT_SERVER_PORT: "8081"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+  JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=75.0"
+  PAYHUB_OIDC_ISSUER: http://zitadel:8080
+  PAYHUB_SECURITY_ISSUER_URI: http://zitadel:8080
+  TRACING_OTLP_ENABLED: "false"
+  FINLEDGER_BASE_URL: http://finledger:8080
+  PAYHUB_FINLEDGER_BASE_URL: http://finledger:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: merchant-service
+  labels: {app.kubernetes.io/name: merchant-service}
+spec:
+  selector: {app.kubernetes.io/name: merchant-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: merchant-service
+  labels: {app.kubernetes.io/name: merchant-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: merchant-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: merchant-service}
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres-merchant -U payhub -d merchant; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-merchant-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-merchant:5432/merchant
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: risk-service
+  labels: {app.kubernetes.io/name: risk-service}
+spec:
+  selector: {app.kubernetes.io/name: risk-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-service
+  labels: {app.kubernetes.io/name: risk-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: risk-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: risk-service}
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres-risk -U payhub -d risk; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-risk-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-risk:5432/risk
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rail-adapter-service
+  labels: {app.kubernetes.io/name: rail-adapter-service}
+spec:
+  selector: {app.kubernetes.io/name: rail-adapter-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rail-adapter-service
+  labels: {app.kubernetes.io/name: rail-adapter-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: rail-adapter-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: rail-adapter-service}
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres-rail -U payhub -d rail; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-rail-adapter-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-rail:5432/rail
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reconciliation-service
+  labels: {app.kubernetes.io/name: reconciliation-service}
+spec:
+  selector: {app.kubernetes.io/name: reconciliation-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconciliation-service
+  labels: {app.kubernetes.io/name: reconciliation-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: reconciliation-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: reconciliation-service}
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres-reconciliation -U payhub -d reconciliation; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-reconciliation-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-reconciliation:5432/reconciliation
+            - name: PAYHUB_KAFKA_ENABLED
+              value: "true"
+            - name: PAYHUB_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reporting-service
+  labels: {app.kubernetes.io/name: reporting-service}
+spec:
+  selector: {app.kubernetes.io/name: reporting-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting-service
+  labels: {app.kubernetes.io/name: reporting-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: reporting-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: reporting-service}
+    spec:
+      initContainers:
+        - name: wait-deps
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres-reporting -U payhub -d reporting; do sleep 2; done
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-reporting-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-reporting:5432/reporting
+            - name: SPRING_DATA_REDIS_HOST
+              value: redis
+            - name: SPRING_DATA_REDIS_PORT
+              value: "6379"
+            - name: PAYHUB_KAFKA_ENABLED
+              value: "true"
+            - name: PAYHUB_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels: {app.kubernetes.io/name: notification-service}
+spec:
+  selector: {app.kubernetes.io/name: notification-service}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels: {app.kubernetes.io/name: notification-service}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: notification-service}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: notification-service}
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "until pg_isready -h postgres-notification -U payhub -d notification; do sleep 2; done"]
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-notification-service:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+            - secretRef: {name: payhub-db}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres-notification:5432/notification
+            - name: PAYHUB_KAFKA_ENABLED
+              value: "true"
+            - name: PAYHUB_KAFKA_BOOTSTRAP_SERVERS
+              value: kafka:9092
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels: {app.kubernetes.io/name: gateway}
+spec:
+  selector: {app.kubernetes.io/name: gateway}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels: {app.kubernetes.io/name: gateway}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: gateway}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: gateway}
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-gateway:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+          env:
+            - name: PAYHUB_GATEWAY_OPS_BFF
+              value: http://ops-bff:8080
+            - name: PAYHUB_GATEWAY_MERCHANT_SERVICE
+              value: http://merchant-service:8080
+            - name: PAYHUB_GATEWAY_PAYMENT_ORCHESTRATOR
+              value: http://payment-orchestrator:8080
+            - name: PAYHUB_GATEWAY_REPORTING_SERVICE
+              value: http://reporting-service:8080
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: merchant-bff
+  labels: {app.kubernetes.io/name: merchant-bff}
+spec:
+  selector: {app.kubernetes.io/name: merchant-bff}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: merchant-bff
+  labels: {app.kubernetes.io/name: merchant-bff}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: merchant-bff}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: merchant-bff}
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-merchant-bff:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-bff
+  labels: {app.kubernetes.io/name: ops-bff}
+spec:
+  selector: {app.kubernetes.io/name: ops-bff}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+    - {name: management, port: 8081, targetPort: 8081}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-bff
+  labels: {app.kubernetes.io/name: ops-bff}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: ops-bff}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: ops-bff}
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/pauluno777/payhub-ops-bff:0.2.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: {name: payhub-app-common}
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: management}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 50m, memory: 192Mi}
+            limits: {cpu: 400m, memory: 384Mi}

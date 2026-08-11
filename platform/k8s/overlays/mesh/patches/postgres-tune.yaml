@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-orchestrator
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgres
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 160Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-temporal
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgres
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 160Mi

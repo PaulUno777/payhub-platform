@@ -40,7 +40,7 @@ PRs are human-owned (agents do not open them unless asked).
 | DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report                                                   | `ds-017/chaos-load`                | done        |
 | DS-018 | Container registry & release: GHCR multi-arch push via `release.yml`, image tagging contract                             | `ds-018/registry-release-workflow` | done        |
 | DS-019 | Kind Temporal failover: single-node kind, Temporal + 2× orchestrator + PDB (no full mesh / HPA / Argo)                   | `ds-019/k8s-gitops`                | done        |
-| DS-020 | Kind mesh (single-node) under RAM budget + proportional data safety (restore/CDC; no laptop multi-node HA)               | `ds-020/kind-mesh-data-safety`     | pending     |
+| DS-020 | Kind mesh (single-node) under RAM budget + proportional data safety (restore/CDC; no laptop multi-node HA)               | `ds-020/kind-mesh-data-safety`     | in progress |
 | DS-021 | SRE: SLOs/error budgets, alerts, runbooks; Prometheus/Grafana (GitOps later)                                             | `ds-021/sre-slo`                   | pending     |
 | DS-022 | Consensus lab: etcd/KRaft, leader failure, Lease and fencing-token exercise                                              | `ds-022/consensus-lab`             | pending     |
 | DS-023 | DR game day: simulated zone loss, recovery within RPO/RTO, reconciliation, report                                        | `ds-023/dr-game-day`               | pending     |

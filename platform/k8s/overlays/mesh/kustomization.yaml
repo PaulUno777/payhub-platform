@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: payhub
+resources:
+  - ../../base
+  - postgres.yaml
+  - kafka.yaml
+  - finledger.yaml
+  - apps.yaml
+patches:
+  - path: patches/orchestrator-mesh.yaml
+  - path: patches/postgres-tune.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: payhub
+      payhub.io/ticket: ds-020
+    includeSelectors: false

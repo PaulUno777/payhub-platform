@@ -1,0 +1,477 @@
+# Tuned Postgres-per-service (DS-020). postgres-orchestrator / postgres-temporal stay
+# in base; mesh overlay patches their command. postgres-finledger has a PVC (CDC source).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-finledger-data
+  labels:
+    app.kubernetes.io/name: postgres-finledger
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-finledger-init
+  labels:
+    app.kubernetes.io/name: postgres-finledger
+data:
+  01-app-role.sql: |
+    DO $$ BEGIN
+      CREATE ROLE finledger_app LOGIN PASSWORD 'finledger';
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+    GRANT ALL PRIVILEGES ON DATABASE finledger TO finledger_app;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-finledger
+  labels:
+    app.kubernetes.io/name: postgres-finledger
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-finledger
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-finledger
+  labels:
+    app.kubernetes.io/name: postgres-finledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-finledger
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-finledger
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args:
+            - -c
+            - wal_level=logical
+            - -c
+            - max_connections=20
+            - -c
+            - shared_buffers=32MB
+            - -c
+            - work_mem=4MB
+          env:
+            - name: POSTGRES_DB
+              value: finledger
+            - name: POSTGRES_USER
+              value: finledger
+            - name: POSTGRES_PASSWORD
+              value: finledger
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "finledger", "-d", "finledger"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 192Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-finledger-data
+        - name: init
+          configMap:
+            name: postgres-finledger-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-merchant
+  labels:
+    app.kubernetes.io/name: postgres-merchant
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-merchant
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-merchant
+  labels:
+    app.kubernetes.io/name: postgres-merchant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-merchant
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-merchant
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: merchant
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "merchant"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-risk
+  labels:
+    app.kubernetes.io/name: postgres-risk
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-risk
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-risk
+  labels:
+    app.kubernetes.io/name: postgres-risk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-risk
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-risk
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: risk
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "risk"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-rail
+  labels:
+    app.kubernetes.io/name: postgres-rail
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-rail
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-rail
+  labels:
+    app.kubernetes.io/name: postgres-rail
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-rail
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-rail
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: rail
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "rail"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-reconciliation
+  labels:
+    app.kubernetes.io/name: postgres-reconciliation
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-reconciliation
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-reconciliation
+  labels:
+    app.kubernetes.io/name: postgres-reconciliation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-reconciliation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-reconciliation
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: reconciliation
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "reconciliation"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-reporting
+  labels:
+    app.kubernetes.io/name: postgres-reporting
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-reporting
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-reporting
+  labels:
+    app.kubernetes.io/name: postgres-reporting
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-reporting
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-reporting
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: reporting
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "reporting"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-notification
+  labels:
+    app.kubernetes.io/name: postgres-notification
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-notification
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-notification
+  labels:
+    app.kubernetes.io/name: postgres-notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-notification
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-notification
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: notification
+            - name: POSTGRES_USER
+              value: payhub
+            - name: POSTGRES_PASSWORD
+              value: payhub
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "payhub", "-d", "notification"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-zitadel
+  labels:
+    app.kubernetes.io/name: postgres-zitadel
+spec:
+  selector:
+    app.kubernetes.io/name: postgres-zitadel
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-zitadel
+  labels:
+    app.kubernetes.io/name: postgres-zitadel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres-zitadel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres-zitadel
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["-c", "max_connections=20", "-c", "shared_buffers=32MB", "-c", "work_mem=4MB"]
+          env:
+            - name: POSTGRES_DB
+              value: zitadel
+            - name: POSTGRES_USER
+              value: zitadel
+            - name: POSTGRES_PASSWORD
+              value: zitadel
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "zitadel", "-d", "zitadel"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 100m, memory: 160Mi}
