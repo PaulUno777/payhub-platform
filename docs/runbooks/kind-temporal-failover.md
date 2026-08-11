@@ -7,6 +7,8 @@ Precondition: DS-018 images on GHCR (`payhub-payment-orchestrator:0.1.0`) or a l
 
 This stack is **exit-focused**: Temporal + orchestrator Postgres + **2** orchestrator
 replicas. Full PayHub mesh (gateway, Kafka, FinLedger, …) stays on Compose for now.
+Kind ConfigMap sets `PAYHUB_SECURITY_LAB_OPEN=true` so runbook curls work without Zitadel —
+never use that flag outside this lab.
 
 ## Prerequisites
 
@@ -84,6 +86,9 @@ echo "$RESP"
 PAYMENT_ID=$(echo "$RESP" | jq -r .id)
 # expect status RISK_REVIEW
 ```
+
+(`kind-config.yaml` maps NodePorts `30080`/`30081` → host `8080`/`8081`. If those
+host ports are busy, use `kubectl -n payhub port-forward svc/payment-orchestrator 8080:8080`.)
 
 Confirm two workers:
 
