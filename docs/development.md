@@ -19,33 +19,33 @@ PRs are human-owned (agents do not open them unless asked).
 
 ## Ticket / branch map (plan §17 — renumbered after the design review)
 
-| Ticket | Phase | Branch slug | Status |
-|--------|-------|-------------|--------|
-| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR | `ds-001/context-map-adr` | done |
-| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions | `ds-002/repo-foundation` | done |
-| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency | `ds-003/finledger-integration` | done |
-| DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject | `ds-004/merchant-service` | done |
-| DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer | `ds-005/outbox-debezium-kafka` | done |
-| DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path` | done |
-| DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects | `ds-007/processing-guarantees` | done |
-| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED` | `ds-008/rail-compensation` | done |
-| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned | `ds-009/refund-workflow` | done |
-| DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console | `ds-010/reconciliation` | done |
-| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF | `ds-011/edge-gateway-bff` | done |
-| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows | `ds-012/otel-tracing` | done |
-| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation | `ds-013/cqrs-reporting` | done |
-| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful | `ds-014/notifications-webhooks` | done |
-| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure | `ds-015/resilience` | done |
-| DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure | `ds-016/event-operations` | done |
-| DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report | `ds-017/chaos-load` | done |
-| DS-018 | Container registry & release: GHCR multi-arch push via `release.yml`, image tagging contract | `ds-018/registry-release-workflow` | done |
-| DS-019 | Kind Temporal failover: single-node kind, Temporal + 2× orchestrator + PDB (no full mesh / HPA / Argo) | `ds-019/k8s-gitops` | in progress |
-| DS-020 | Kind mesh (single-node) under RAM budget + proportional data safety (restore/CDC; no laptop multi-node HA) | `ds-020/kind-mesh-data-safety` | pending |
-| DS-021 | SRE: SLOs/error budgets, alerts, runbooks; Prometheus/Grafana (GitOps later) | `ds-021/sre-slo` | pending |
-| DS-022 | Consensus lab: etcd/KRaft, leader failure, Lease and fencing-token exercise | `ds-022/consensus-lab` | pending |
-| DS-023 | DR game day: simulated zone loss, recovery within RPO/RTO, reconciliation, report | `ds-023/dr-game-day` | pending |
-| DS-024 | Mesh POC: only after a cost/benefit ADR; mTLS and canary compared to the in-app solution | `ds-024/mesh-poc` | pending |
-| DS-025 | Capstone: payment + refund demo with rail/Kafka outage, recovery, reconciliation, audit, architecture review | `ds-025/capstone` | pending |
+| Ticket | Phase                                                                                                                    | Branch slug                        | Status      |
+| ------ | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ----------- |
+| DS-001 | DDD cadrage: event storming, context map (incl. Merchant), ubiquitous language, ownership, CAP/PACELC ADR                | `ds-001/context-map-adr`           | done        |
+| DS-002 | Repo foundation: hexagonal skeleton for all 10 services, ArchUnit, Compose, CI, contract conventions                     | `ds-002/repo-foundation`           | done        |
+| DS-003 | FinLedger integration: pinned image, Orchestrator `LedgerPort` ACL (smoke rails/connectivity), tenant/trace/idempotency  | `ds-003/finledger-integration`     | done        |
+| DS-004 | Merchant service: `Merchant` aggregate, FinLedger `SUB_MERCHANT` tenant + wallets on activation, Ops BFF approve/reject  | `ds-004/merchant-service`          | done        |
+| DS-005 | Event backbone: FinLedger outbox → Debezium → Kafka, Schema Registry, AsyncAPI, first inbox consumer                     | `ds-005/outbox-debezium-kafka`     | done        |
+| DS-006 | Payment happy path (no real rail): `Payment` aggregate, API idempotency, Temporal, sync = `RISK_APPROVED`, RailPort stub | `ds-006/payment-happy-path`        | done        |
+| DS-007 | Processing guarantees: standardized inbox/outbox, retries, idempotent side effects                                       | `ds-007/processing-guarantees`     | done        |
+| DS-008 | Rail + compensation: PSP→initiate→settle order, MmSandbox, ambiguous timeout; happy path to `SETTLED`                    | `ds-008/rail-compensation`         | done        |
+| DS-009 | Refund: `RefundWorkflow`, `POST .../refunds`, `NO_REVERSE` tenant policy provisioned                                     | `ds-009/refund-workflow`           | done        |
+| DS-010 | Reconciliation: statement import, breaks, lock/leadership, minimal Ops console                                           | `ds-010/reconciliation`            | done        |
+| DS-011 | Edge: Gateway, OIDC/JWT, tenant isolation, rate limiting, Merchant/Ops BFF                                               | `ds-011/edge-gateway-bff`          | done        |
+| DS-012 | Tracing: end-to-end OTel, trace linked across events and workflows                                                       | `ds-012/otel-tracing`              | done        |
+| DS-013 | CQRS: Reporting projection, staleness, Redis cache-aside, event-driven invalidation                                      | `ds-013/cqrs-reporting`            | done        |
+| DS-014 | Notifications: signed webhooks, retries, DLQ; RabbitMQ POC documented if useful                                          | `ds-014/notifications-webhooks`    | done        |
+| DS-015 | Resilience: budgets, timeouts, retries, circuit breakers, bulkheads, shedding, backpressure                              | `ds-015/resilience`                | done        |
+| DS-016 | Event operations: retry topics, replay tool, quotas, rebalances, poison-message procedure                                | `ds-016/event-operations`          | done        |
+| DS-017 | Chaos/load: fault injection, blast-radius measurement, capacity report                                                   | `ds-017/chaos-load`                | done        |
+| DS-018 | Container registry & release: GHCR multi-arch push via `release.yml`, image tagging contract                             | `ds-018/registry-release-workflow` | done        |
+| DS-019 | Kind Temporal failover: single-node kind, Temporal + 2× orchestrator + PDB (no full mesh / HPA / Argo)                   | `ds-019/k8s-gitops`                | done        |
+| DS-020 | Kind mesh (single-node) under RAM budget + proportional data safety (restore/CDC; no laptop multi-node HA)               | `ds-020/kind-mesh-data-safety`     | pending     |
+| DS-021 | SRE: SLOs/error budgets, alerts, runbooks; Prometheus/Grafana (GitOps later)                                             | `ds-021/sre-slo`                   | pending     |
+| DS-022 | Consensus lab: etcd/KRaft, leader failure, Lease and fencing-token exercise                                              | `ds-022/consensus-lab`             | pending     |
+| DS-023 | DR game day: simulated zone loss, recovery within RPO/RTO, reconciliation, report                                        | `ds-023/dr-game-day`               | pending     |
+| DS-024 | Mesh POC: only after a cost/benefit ADR; mTLS and canary compared to the in-app solution                                 | `ds-024/mesh-poc`                  | pending     |
+| DS-025 | Capstone: payment + refund demo with rail/Kafka outage, recovery, reconciliation, audit, architecture review             | `ds-025/capstone`                  | pending     |
 
 Work proceeds **one ticket at a time** with human PR gates. Check the ticket's exit
 criterion from `PLAN_PAYHUB.md` §17 explicitly before considering it done.
@@ -76,6 +76,7 @@ this guide and it contradicts the project's own progressive-complexity principle
 
 Config Server must be reachable for `compose` profile (or use `optional:configserver:` +
 classpath test YAML). Boot order locally: `config-server` → Postgres → apps / FinLedger.
+
 ### 0. Conventions used for every service
 
 - `groupId`: `com.payhub`
@@ -190,13 +191,13 @@ unzip -q notification-service.zip -d services/notification-service && rm notific
 
 Dependency timing, made explicit so nothing gets added early "just in case":
 
-| Dependency | Services | Added at |
-|---|---|---|
-| `kafka` (Spring Kafka) | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service, notification-service | DS-005 (event backbone); notification at DS-014 |
-| Temporal SDK | payment-orchestrator | DS-006 (payment happy path) |
-| `data-redis` | reporting-service | DS-013 (CQRS) |
-| RabbitMQ (Compose profile `rabbitmq`) | lab only — not a service dependency | DS-014 (comparison lab; exit path = HTTP retries + Postgres `DEAD`) |
-| Resilience4j | payment-orchestrator (primary); rail-adapter as needed | DS-015 (resilience) |
+| Dependency                            | Services                                                                                                    | Added at                                                            |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `kafka` (Spring Kafka)                | payment-orchestrator, rail-adapter-service, reconciliation-service, reporting-service, notification-service | DS-005 (event backbone); notification at DS-014                     |
+| Temporal SDK                          | payment-orchestrator                                                                                        | DS-006 (payment happy path)                                         |
+| `data-redis`                          | reporting-service                                                                                           | DS-013 (CQRS)                                                       |
+| RabbitMQ (Compose profile `rabbitmq`) | lab only — not a service dependency                                                                         | DS-014 (comparison lab; exit path = HTTP retries + Postgres `DEAD`) |
+| Resilience4j                          | payment-orchestrator (primary); rail-adapter as needed                                                      | DS-015 (resilience)                                                 |
 
 - `flyway` everywhere a service owns a Postgres schema — migrations are expand/contract
   from day one (plan §15.2).

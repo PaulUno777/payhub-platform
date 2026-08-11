@@ -4,12 +4,6 @@ resources:
   - ../../base
 images:
   - name: ghcr.io/pauluno777/payhub-payment-orchestrator
-    newTag: "0.1.0"
-patches:
-  - target:
-      kind: Deployment
-      name: payment-orchestrator
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/imagePullPolicy
-        value: Always
+    newTag: "0.2.0"
+# Keep IfNotPresent (base): kind load + laptop registry DNS flakiness.
+# True always-pull is not required for the DS-019 exit lab.

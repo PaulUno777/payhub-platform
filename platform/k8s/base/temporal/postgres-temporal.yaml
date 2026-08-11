@@ -31,6 +31,7 @@ spec:
       containers:
         - name: postgres
           image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_DB
               value: temporal
@@ -45,9 +46,11 @@ spec:
               command: ["pg_isready", "-U", "temporal", "-d", "temporal"]
             initialDelaySeconds: 5
             periodSeconds: 5
+            failureThreshold: 12
           resources:
             requests:
               cpu: 50m
               memory: 128Mi
             limits:
+              cpu: 100m
               memory: 512Mi

@@ -2,8 +2,10 @@
 
 Exit criterion: *a Temporal worker pod killed mid-saga is resumed by another worker.*
 
-Precondition: DS-018 images on GHCR (`payhub-payment-orchestrator:0.1.0`) or a local
-`:local` image loaded into kind (ADR-008).
+Precondition: GHCR `payhub-payment-orchestrator:0.2.0` (or a local `:local` image) loaded
+into kind (ADR-008). Base Deployments use `imagePullPolicy: IfNotPresent` and init
+containers so Temporal waits on Postgres (schema setup) and the orchestrator waits on
+Temporal before serving traffic.
 
 This stack is **exit-focused**: Temporal + orchestrator Postgres + **2** orchestrator
 replicas. Full PayHub mesh (gateway, Kafka, FinLedger, …) stays on Compose for now.
@@ -36,13 +38,18 @@ kind load docker-image pauluno/payhub-payment-orchestrator:local --name payhub
 kubectl apply -k platform/k8s/overlays/local-load
 ```
 
-**Prod-like pull** (use after a release that includes the DS-019 orchestrator changes):
+**Prod-like / GHCR path** (preferred after `v0.2.0+`). If the kind node cannot reach
+registries (common on Docker Desktop DNS), load images from the host first:
 
 ```bash
-# If GHCR packages are private:
-#   kubectl create secret docker-registry ghcr-pull -n payhub \
-#     --docker-server=ghcr.io --docker-username=USER --docker-password=TOKEN
-# then patch the Deployment to use imagePullSecrets: [ghcr-pull]
+docker pull ghcr.io/pauluno777/payhub-payment-orchestrator:0.2.0
+docker pull postgres:17-alpine
+docker pull temporalio/auto-setup:1.25.2
+docker pull busybox:1.36
+kind load docker-image ghcr.io/pauluno777/payhub-payment-orchestrator:0.2.0 --name payhub
+kind load docker-image postgres:17-alpine --name payhub
+kind load docker-image temporalio/auto-setup:1.25.2 --name payhub
+kind load docker-image busybox:1.36 --name payhub
 
 kubectl apply -k platform/k8s/overlays/ghcr
 ```
@@ -125,12 +132,12 @@ kubectl -n payhub logs -l app.kubernetes.io/name=payment-orchestrator --tail=100
 
 ## Exit criterion checklist (DS-019)
 
-- [ ] kind cluster `payhub` created from `platform/k8s/kind/kind-config.yaml`
-- [ ] `kubectl apply -k platform/k8s/overlays/ghcr` (or `local-load`) — all pods Ready
-- [ ] Two `payment-orchestrator` replicas on task queue `payment-capture`
-- [ ] Payment/workflow started and parked (or in-flight)
-- [ ] One orchestrator pod deleted; Deployment restores replica count
-- [ ] Workflow resumed / completed via the surviving worker (signal + logs)
+- [x] kind cluster `payhub` created from `platform/k8s/kind/kind-config.yaml`
+- [x] `kubectl apply -k platform/k8s/overlays/ghcr` (or `local-load`) — all pods Ready
+- [x] Two `payment-orchestrator` replicas on task queue `payment-capture`
+- [x] Payment/workflow started and parked (or in-flight)
+- [x] One orchestrator pod deleted; Deployment restores replica count
+- [x] Workflow resumed / completed via the surviving worker (signal + logs)
 
 When checked, mark DS-019 **done** in `docs/development.md`. Do not start DS-020 until then.
 
